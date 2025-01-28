@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import auth from '@react-native-firebase/auth';
+import axios from 'axios';
 
 const SignupScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
@@ -9,7 +10,7 @@ const SignupScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     setLoading(true);
     setError('');
 
@@ -19,23 +20,31 @@ const SignupScreen = ({ navigation }) => {
       return;
     }
 
-    auth()
-      .createUserWithEmailAndPassword(email, password)
-      .then(() => {
-        setLoading(false);
-        console.log('User signed up');
-        navigation.replace('Home');
-      })
-      .catch((error) => {
-        setLoading(false);
-        if (error.code === 'auth/email-already-in-use') {
-          setError('Email is already in use.');
-        } else if (error.code === 'auth/invalid-email') {
-          setError('Invalid email format.');
-        } else {
-          setError('An error occurred. Please try again later.');
-        }
+    try {
+      // Step 1: Create user with Firebase Authentication
+      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+      const user = userCredential.user;
+
+      // Step 2: Send the user data (username, email, uid) to the backend (MongoDB)
+      await axios.post('http://192.168.68.86:5000/signup', {
+        username,
+        email,
+        uid: user.uid,
       });
+
+      setLoading(false);
+      console.log('User signed up and stored in MongoDB');
+      navigation.replace('Home'); // Navigate to Home screen after signup
+    } catch (error) {
+      setLoading(false);
+      if (error.code === 'auth/email-already-in-use') {
+        setError('Email is already in use.');
+      } else if (error.code === 'auth/invalid-email') {
+        setError('Invalid email format.');
+      } else {
+        setError('An error occurred. Please try again later.');
+      }
+    }
   };
 
   return (

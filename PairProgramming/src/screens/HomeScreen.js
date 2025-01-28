@@ -1,17 +1,29 @@
 // HomeScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Button, StyleSheet, TouchableOpacity } from 'react-native';
 import axios from 'axios';
 import auth from '@react-native-firebase/auth';
 
 const HomeScreen = ({ navigation }) => {
-  const [username, setUsername] = useState(auth().currentUser.displayName || 'Guest');
+  const [uid, setUsername] = useState('Guest');
+
+  // Fetch the current user information
+  useEffect(() => {
+    const user = auth().currentUser;
+    if (user) {
+      setUsername(user.uid || 'Guest');
+    }
+  }, []);
 
   const handleStartToday = async () => {
     try {
-      console.log(username)
-      await axios.post('http://192.168.68.85:5000/start-today', { username });
-      navigation.navigate('UserList'); // Navigate to UserListScreen after success
+      console.log('Username:', uid);
+
+      // Send a POST request to your backend to save the user's "Start Today" click
+      await axios.post('http://192.168.68.80:5000/start-today', { uid });
+
+      // Navigate to UserListScreen after success
+      navigation.navigate('UserList');
     } catch (error) {
       console.error('Error sending user data:', error);
     }
@@ -20,12 +32,13 @@ const HomeScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Welcome to the Home Screen!</Text>
-      
+
+      {/* Log out button */}
       <Button
         title="Log out"
         onPress={() => {
           auth().signOut(); // Sign out the user
-          navigation.replace('Login'); // Redirect to login screen
+          navigation.replace('Login'); // Redirect to the login screen
         }}
       />
 
@@ -38,7 +51,7 @@ const HomeScreen = ({ navigation }) => {
       </TouchableOpacity>
     </View>
   );
-};
+}; 
 
 const styles = StyleSheet.create({
   container: {

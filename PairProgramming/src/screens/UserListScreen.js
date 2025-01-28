@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet } from 'react-native';
 import axios from 'axios';
+import auth from '@react-native-firebase/auth'; // Correct Firebase import
 
 const UserListScreen = () => {
   const [users, setUsers] = useState([]);
@@ -11,8 +12,18 @@ const UserListScreen = () => {
   useEffect(() => {
     const fetchUserList = async () => {
       try {
+        // Get the UID of the current user from Firebase Auth
+        const currentUserUID = auth().currentUser?.uid; // Ensure it’s correctly fetched
+
+        if (!currentUserUID) {
+          throw new Error('No user is currently logged in');
+        }
+
+        console.log('Current User UID:', currentUserUID); // Debugging line
+
         // Make sure the IP address is correct (replace with your server's local IP)
-        const response = await axios.get('http://192.168.68.85:5000/get-users');
+        const response = await axios.get(`http://192.168.68.80:5000/get-users?uid=${currentUserUID}`);
+
         setUsers(response.data.users); // Set the fetched users to state
       } catch (err) {
         setError('Error fetching user list');
@@ -21,7 +32,7 @@ const UserListScreen = () => {
     };
 
     fetchUserList();
-  }, []); // Empty dependency array ensures it runs only once when the component mounts
+  }, []); 
 
   if (error) {
     return (

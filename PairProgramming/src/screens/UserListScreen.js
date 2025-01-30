@@ -1,10 +1,9 @@
-// UserListScreen.js
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+import { View, Text, FlatList, Button, StyleSheet } from 'react-native';
 import axios from 'axios';
 import auth from '@react-native-firebase/auth'; // Correct Firebase import
 
-const UserListScreen = () => {
+const UserListScreen = ({ navigation }) => {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState(null);
 
@@ -19,10 +18,10 @@ const UserListScreen = () => {
           throw new Error('No user is currently logged in');
         }
 
-        console.log('Current User UID:', currentUserUID); // Debugging line
+        // console.log('Current User UID:', currentUserUID); // Debugging line
 
         // Make sure the IP address is correct (replace with your server's local IP)
-        const response = await axios.get(`http://192.168.68.80:5000/get-users?uid=${currentUserUID}`);
+        const response = await axios.get(`http://192.168.141.29:5000/get-users?uid=${currentUserUID}`);
 
         setUsers(response.data.users); // Set the fetched users to state
       } catch (err) {
@@ -32,7 +31,7 @@ const UserListScreen = () => {
     };
 
     fetchUserList();
-  }, []); 
+  }, []);
 
   if (error) {
     return (
@@ -42,16 +41,25 @@ const UserListScreen = () => {
     );
   }
 
+  const handleChatPress = (otherUserUID) => {
+    // Navigate to the Chat screen, passing the other user's UID as a parameter
+    navigation.navigate('Chat', { otherUserUID });
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.text}>User List for Today</Text>
       {users.length > 0 ? (
         <FlatList
           data={users}
-          keyExtractor={(item) => item._id.toString()} // Assuming MongoDB uses ObjectId for unique user ID
+          keyExtractor={(item) => item.uid.toString()} // Assuming each user has a 'uid'
           renderItem={({ item }) => (
             <View style={styles.userItem}>
               <Text style={styles.userText}>{item.username}</Text>
+              <Button
+                title="Chat"
+                onPress={() => handleChatPress(item.uid)} // Pass the other user's UID instead of _id
+              />
             </View>
           )}
         />
@@ -78,9 +86,14 @@ const styles = StyleSheet.create({
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
   },
   userText: {
     fontSize: 18,
+    flex: 1,
   },
 });
 

@@ -26,7 +26,7 @@ const SignupScreen = ({ navigation }) => {
       const user = userCredential.user;
 
       // Step 2: Send the user data (username, email, uid) to the backend (MongoDB)
-      await axios.post('http://192.168.68.86:5000/signup', {
+      await axios.post('http://192.168.141.29:5000/signup', {
         username,
         email,
         uid: user.uid,

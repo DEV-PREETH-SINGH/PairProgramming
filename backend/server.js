@@ -4,9 +4,19 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 require('dotenv').config();
 
+//socket.io
+
+
 const app = express();
 
 // Middleware
+const http = require('http');
+const socketIo = require('socket.io');
+const server = http.createServer(app);
+const io = socketIo(server);
+
+
+
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -17,6 +27,9 @@ mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTop
 
 // Import User model
 const User = require('./models/User');
+
+// Import Message model
+const Message = require('./models/message'); // Assuming you have created this in the models folder
 
 // Health Check Endpoint
 app.get('/health', (req, res) => {
@@ -78,28 +91,6 @@ app.post('/start-today', async (req, res) => {
   }
 });
 
-// Get users who clicked "Start Today" on the current day
-// app.get('/get-users', async (req, res) => {
-//   try {
-//     // Get the current date range (start and end of the day)
-//     const startOfDay = new Date();
-//     startOfDay.setHours(0, 0, 0, 0);
-
-//     const endOfDay = new Date();
-//     endOfDay.setHours(23, 59, 59, 999);
-
-//     // Fetch users where `clickedStartToday` is true and `dateJoined` is within today
-//     const users = await User.find({
-//       clickedStartToday: true,
-//       dateJoined: { $gte: startOfDay, $lte: endOfDay },
-//     });
-
-//     res.status(200).send({ message: 'Users fetched successfully', users });
-//   } catch (err) {
-//     console.error('Error fetching users:', err);
-//     res.status(500).send({ message: 'Error fetching users', error: err.message });
-//   }
-// });
 // Get users who clicked "Start Today" on the current day, excluding the current user
 app.get('/get-users', async (req, res) => {
   const { uid } = req.query; // Get UID from query params
@@ -129,6 +120,103 @@ app.get('/get-users', async (req, res) => {
     res.status(500).send({ message: 'Error fetching users', error: err.message });
   }
 });
+
+// =====================
+// Messaging Endpoints
+// =====================
+
+// Endpoint to get messages between two users
+app.get('/api/messages/get-messages', async (req, res) => {
+  const { user1, user2 } = req.query;
+
+  if (!user1 || !user2) {
+    return res.status(400).send({ message: 'Missing user1 or user2 in request' });
+  }
+
+  try {
+    const messages = await Message.find({
+      $or: [
+        { senderUID: user1, receiverUID: user2 },
+        { senderUID: user2, receiverUID: user1 },
+      ],
+    }).sort({ timestamp: 1 }); // Sort by timestamp (oldest first)
+
+    res.status(200).json({ messages });
+  } catch (err) {
+    console.error('Error fetching messages:', err);
+    res.status(500).send({ message: 'Error fetching messages', error: err.message });
+  }
+});
+// WebSocket connection event
+io.on('connection', (socket) => {
+  console.log('A user connected');
+
+  // Handle receiving message
+  socket.on('sendMessage', async (messageData) => {
+    console.log('Message received:', messageData);
+
+    try {
+      const { senderUID, receiverUID, message } = messageData;
+
+      const newMessage = new Message({
+        senderUID,
+        receiverUID,
+        message,
+        timestamp: new Date(),
+      });
+
+      const savedMessage = await newMessage.save();
+
+      // Emit the new message to the receiver
+      io.emit('newMessage', savedMessage);
+
+      socket.emit('messageSent', savedMessage); // Emit back to sender for confirmation
+    } catch (err) {
+      console.error('Error handling sendMessage:', err);
+      socket.emit('error', { message: 'Error sending message', error: err.message });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected');
+  });
+});
+
+// Your existing express server and message endpoint...
+// Endpoint to send a new message
+app.post('/api/messages/send-message', async (req, res) => {
+  const { senderUID, receiverUID, message } = req.body;
+
+  if (!senderUID || !receiverUID || !message) {
+    return res.status(400).send({ message: 'Missing required fields: senderUID, receiverUID, or message' });
+  }
+
+  try {
+    const newMessage = new Message({
+      senderUID,
+      receiverUID,
+      message,
+      timestamp: new Date(),
+    });
+
+    const savedMessage = await newMessage.save();
+    res.status(201).send({
+      message: 'Message sent successfully',
+      savedMessage,
+    });
+
+    // Emit the message via WebSocket
+    io.emit('newMessage', savedMessage);
+  } catch (err) {
+    console.error('Error sending message:', err);
+    res.status(500).send({
+      message: 'Error sending message',
+      error: err.message,
+    });
+  }
+});
+
+
 
 
 // Start the server

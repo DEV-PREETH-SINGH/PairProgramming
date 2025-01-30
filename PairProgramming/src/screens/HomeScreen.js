@@ -1,8 +1,13 @@
 // HomeScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, Button, StyleSheet, TouchableOpacity } from 'react-native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import axios from 'axios';
 import auth from '@react-native-firebase/auth';
+import UserListScreen from './UserListScreen'; // Import UserListScreen
+import ChatScreen from './ChatScreen'; // Import ChatScreen
+
+const Tab = createBottomTabNavigator();
 
 const HomeScreen = ({ navigation }) => {
   const [uid, setUsername] = useState('Guest');
@@ -20,7 +25,7 @@ const HomeScreen = ({ navigation }) => {
       console.log('Username:', uid);
 
       // Send a POST request to your backend to save the user's "Start Today" click
-      await axios.post('http://192.168.68.80:5000/start-today', { uid });
+      await axios.post('http://192.168.141.29:5000/start-today', { uid });
 
       // Navigate to UserListScreen after success
       navigation.navigate('UserList');
@@ -30,28 +35,51 @@ const HomeScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Welcome to the Home Screen!</Text>
-
-      {/* Log out button */}
-      <Button
-        title="Log out"
-        onPress={() => {
-          auth().signOut(); // Sign out the user
-          navigation.replace('Login'); // Redirect to the login screen
-        }}
+    <Tab.Navigator>
+      {/* User List Tab */}
+      <Tab.Screen
+        name="UserList"
+        component={UserListScreen}
+        options={{ tabBarLabel: 'User List' }}
       />
 
-      {/* Start Today Button */}
-      <TouchableOpacity
-        style={styles.startTodayButton}
-        onPress={handleStartToday} // Call handleStartToday when pressed
-      >
-        <Text style={styles.startTodayText}>Start Today</Text>
-      </TouchableOpacity>
-    </View>
+      {/* Chat Tab */}
+      <Tab.Screen
+        name="Chats"
+        component={ChatScreen}
+        options={{ tabBarLabel: 'Chats' }}
+      />
+
+      {/* Welcome screen */}
+      <Tab.Screen
+        name="Welcome"
+        component={() => (
+          <View style={styles.container}>
+            <Text style={styles.header}>Welcome to the Home Screen, {uid}!</Text>
+
+            {/* Log out button */}
+            <Button
+              title="Log out"
+              onPress={() => {
+                auth().signOut(); // Sign out the user
+                navigation.replace('Login'); // Redirect to the login screen
+              }}
+            />
+
+            {/* Start Today Button */}
+            <TouchableOpacity
+              style={styles.startTodayButton}
+              onPress={handleStartToday} // Call handleStartToday when pressed
+            >
+              <Text style={styles.startTodayText}>Start Today</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        options={{ tabBarLabel: 'Home' }}
+      />
+    </Tab.Navigator>
   );
-}; 
+};
 
 const styles = StyleSheet.create({
   container: {

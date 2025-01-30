@@ -4,6 +4,7 @@ import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import HomeScreen from '../screens/HomeScreen';
 import UserListScreen from '../screens/UserListScreen';
+import ChatScreen from '../screens/ChatScreen'; // Import the ChatScreen
 
 const Stack = createStackNavigator();
 
@@ -14,6 +15,7 @@ const AppNavigator = () => {
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="UserList" component={UserListScreen} />
+      <Stack.Screen name="Chat" component={ChatScreen} /> 
     </Stack.Navigator>
   );
 };

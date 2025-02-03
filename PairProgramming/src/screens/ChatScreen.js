@@ -17,7 +17,7 @@ const ChatScreen = ({ route, navigation }) => {
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        const response = await axios.get('http://192.168.141.29:5000/api/messages/get-messages', {
+        const response = await axios.get('http://192.168.68.63:5000/api/messages/get-messages', {
           params: { user1: currentUserUID, user2: extractedOtherUserUID },
         });
 
@@ -63,7 +63,7 @@ const ChatScreen = ({ route, navigation }) => {
   
     try {
       // Send the message to the backend
-      const response = await axios.post('http://192.168.141.29:5000/api/messages/send-message', {
+      const response = await axios.post('http://192.168.68.63:5000/api/messages/send-message', {
         senderUID: currentUserUID,
         receiverUID: extractedOtherUserUID,
         message: messageText,

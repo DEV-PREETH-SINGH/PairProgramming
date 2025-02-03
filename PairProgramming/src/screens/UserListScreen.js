@@ -21,7 +21,7 @@ const UserListScreen = ({ navigation }) => {
         // console.log('Current User UID:', currentUserUID); // Debugging line
 
         // Make sure the IP address is correct (replace with your server's local IP)
-        const response = await axios.get(`http://192.168.141.29:5000/get-users?uid=${currentUserUID}`);
+        const response = await axios.get(`http://192.168.68.63:5000/get-users?uid=${currentUserUID}`);
 
         setUsers(response.data.users); // Set the fetched users to state
       } catch (err) {

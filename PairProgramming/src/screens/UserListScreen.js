@@ -13,6 +13,7 @@ const UserListScreen = ({ navigation }) => {
       try {
         // Get the UID of the current user from Firebase Auth
         const currentUserUID = auth().currentUser?.uid; // Ensure it’s correctly fetched
+        
 
         if (!currentUserUID) {
           throw new Error('No user is currently logged in');

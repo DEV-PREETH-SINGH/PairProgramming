@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import axios from 'axios';
 import auth from '@react-native-firebase/auth';
 import UserListScreen from './UserListScreen'; // Import UserListScreen
-import ChatScreen from './ChatScreen'; // Import ChatScreen
+import ChatListScreen from './ChatListScreen'; // Import ChatScreen
 
 const Tab = createBottomTabNavigator();
 
@@ -46,7 +46,7 @@ const HomeScreen = ({ navigation }) => {
       {/* Chat Tab */}
       <Tab.Screen
         name="Chats"
-        component={ChatScreen}
+        component={ChatListScreen}
         options={{ tabBarLabel: 'Chats' }}
       />
 

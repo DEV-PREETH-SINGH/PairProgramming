@@ -10,17 +10,19 @@ const ChatScreen = ({ route, navigation }) => {
 
   const currentUserUID = auth().currentUser?.uid;
   const { otherUserUID } = route.params;
+  const { userUID } = route.params;
 
-  const extractedOtherUserUID = otherUserUID?.uid || otherUserUID;
+  const extractedOtherUserUID = otherUserUID?.uid || otherUserUID || userUID;
   const chatContainerRef = useRef();  // Reference for auto-scrolling
 
   useEffect(() => {
     const fetchMessages = async () => {
       try {
+        console.log(currentUserUID,extractedOtherUserUID)
         const response = await axios.get('http://192.168.68.63:5000/api/messages/get-messages', {
           params: { user1: currentUserUID, user2: extractedOtherUserUID },
         });
-
+        // console.log(user1,user2);
         const validMessages = response.data.messages?.filter(
           (msg) => msg.senderUID && msg.message
         ) || [];

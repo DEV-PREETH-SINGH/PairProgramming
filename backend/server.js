@@ -216,6 +216,52 @@ app.post('/api/messages/send-message', async (req, res) => {
   }
 });
 
+// Route to get distinct chat users
+app.get('/get-chat-users', async (req, res) => {
+  const { uid } = req.query; // Current user UID from the frontend
+
+  if (!uid) {
+    return res.status(400).send('User UID is required');
+  }
+
+  try {
+    const chatUsers = await Message.aggregate([
+      {
+        $match: {
+          $or: [
+            { senderUID: uid },
+            { receiverUID: uid }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $cond: {
+              if: { $eq: ["$senderUID", uid] },
+              then: "$receiverUID",
+              else: "$senderUID"
+            }
+          }
+        }
+      },
+      {
+        $project: { _id: 1 } // Project only the user IDs
+      }
+    ]);
+
+    if (chatUsers.length === 0) {
+      return res.status(404).send('No chat users found');
+    }
+
+    res.json(chatUsers); // Send the list of users to the frontend
+  } catch (error) {
+    console.error('Error fetching chat users:', error);
+    res.status(500).send('Server error');
+  }
+});
+
+
 
 
 

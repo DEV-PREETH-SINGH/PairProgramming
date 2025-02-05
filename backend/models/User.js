@@ -24,6 +24,14 @@ const UserSchema = new mongoose.Schema({
     type: Boolean, 
     default: false 
   },
+  preferredLanguage: { 
+    type: String, 
+    
+  },
+  preferredSolvingTime: { 
+    type: String, 
+    
+  },
 });
 
 // Create a User model based on the updated schema

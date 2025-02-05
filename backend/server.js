@@ -45,6 +45,7 @@ app.post('/signup', async (req, res) => {
   }
 
   try {
+    console.log("1")
     const existingUser = await User.findOne({ uid });
     if (existingUser) {
       return res.status(400).send({ message: 'User already exists' });
@@ -56,6 +57,8 @@ app.post('/signup', async (req, res) => {
       uid,
       clickedStartToday: false, // Initialize as false
       dateJoined: null,         // No timestamp until "Start Today" is clicked
+      preferredLanguage:"",
+      preferredSolvingTime:"",
     });
     await newUser.save();
     res.status(201).send({ message: 'User registered successfully', user: newUser });
@@ -92,6 +95,7 @@ app.post('/start-today', async (req, res) => {
 });
 
 // Get users who clicked "Start Today" on the current day, excluding the current user
+// server.js (Backend)
 app.get('/get-users', async (req, res) => {
   const { uid } = req.query; // Get UID from query params
 
@@ -100,6 +104,12 @@ app.get('/get-users', async (req, res) => {
   }
 
   try {
+    // Get the current user's profile preferences
+    const currentUser = await User.findOne({ uid });
+    if (!currentUser) {
+      return res.status(404).send({ message: 'User not found' });
+    }
+
     // Get the current date range (start and end of the day)
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -107,11 +117,17 @@ app.get('/get-users', async (req, res) => {
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Fetch users where `clickedStartToday` is true, `dateJoined` is within today, and exclude the current user
+    // Fetch users where:
+    // 1. clickedStartToday is true
+    // 2. dateJoined is within today
+    // 3. preferredLanguage and preferredSolvingTime match current user's profile
+    // 4. Exclude the current user's UID
     const users = await User.find({
       clickedStartToday: true,
       dateJoined: { $gte: startOfDay, $lte: endOfDay },
-      uid: { $ne: uid }, // Exclude the current user's UID
+      preferredLanguage: currentUser.preferredLanguage,
+      preferredSolvingTime: currentUser.preferredSolvingTime,
+      uid: { $ne: uid }, // Exclude current user's UID
     });
 
     res.status(200).send({ message: 'Users fetched successfully', users });
@@ -120,6 +136,7 @@ app.get('/get-users', async (req, res) => {
     res.status(500).send({ message: 'Error fetching users', error: err.message });
   }
 });
+
 
 // =====================
 // Messaging Endpoints
@@ -261,6 +278,78 @@ app.get('/get-chat-users', async (req, res) => {
   }
 });
 
+app.post('/create-profile', async (req, res) => {
+  const { uid, preferredLanguage, preferredSolvingTime } = req.body;
+
+  if (!uid || !preferredLanguage || !preferredSolvingTime) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    const existingUser = await User.findOne({ uid });
+
+    if (existingUser) {
+      existingUser.preferredLanguage = preferredLanguage;
+      existingUser.preferredSolvingTime = preferredSolvingTime;
+      await existingUser.save();
+      return res.status(200).json({ message: 'Profile updated successfully', user: existingUser });
+    }
+
+    const newUser = new User({ uid, preferredLanguage, preferredSolvingTime });
+    await newUser.save();
+    res.status(201).json({ message: 'Profile created successfully', user: newUser });
+  } catch (err) {
+    console.error('Error saving profile:', err);
+    res.status(500).json({ message: 'Error saving profile', error: err.message });
+  }
+});
+
+app.put('/update-profile', async (req, res) => {
+  const { uid, username, preferredLanguage, preferredSolvingTime } = req.body;
+
+  if (!uid || !username || !preferredLanguage || !preferredSolvingTime) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    const updatedUser = await User.findOneAndUpdate(
+      { uid }, // Find user by UID
+      { username, preferredLanguage, preferredSolvingTime },
+      { new: true, upsert: false } // Do not create a new user if not found
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'Profile updated successfully', user: updatedUser });
+  } catch (err) {
+    console.error('Error updating profile:', err);
+    res.status(500).json({ message: 'Error updating profile', error: err.message });
+  }
+});
+
+// API endpoint to fetch user details by UID
+app.get('/user/:uid', async (req, res) => {
+  const { uid } = req.params;
+
+  if (!uid) {
+    return res.status(400).json({ message: 'User ID is required' });
+  }
+
+  try {
+    const user = await User.findOne({ uid });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json(user);
+  } catch (err) {
+    console.error('Error fetching user data:', err);
+    res.status(500).json({ message: 'Error fetching user data', error: err.message });
+  }
+});
 
 
 

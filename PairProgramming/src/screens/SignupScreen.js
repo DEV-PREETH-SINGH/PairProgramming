@@ -26,7 +26,8 @@ const SignupScreen = ({ navigation }) => {
       const user = userCredential.user;
 
       // Step 2: Send the user data (username, email, uid) to the backend (MongoDB)
-      await axios.post('http://192.168.68.63:5000/signup', {
+      console.log("1")
+      await axios.post('http://192.168.68.77:5000/signup', {
         username,
         email,
         uid: user.uid,
@@ -34,7 +35,7 @@ const SignupScreen = ({ navigation }) => {
 
       setLoading(false);
       console.log('User signed up and stored in MongoDB');
-      navigation.replace('Home'); // Navigate to Home screen after signup
+      navigation.replace('ProfileCompletion'); // Navigate to Home screen after signup
     } catch (error) {
       setLoading(false);
       if (error.code === 'auth/email-already-in-use') {

@@ -6,6 +6,7 @@ import axios from 'axios';
 import auth from '@react-native-firebase/auth';
 import UserListScreen from './UserListScreen'; // Import UserListScreen
 import ChatListScreen from './ChatListScreen'; // Import ChatScreen
+import ProfileEditScreen from './ProfileEditScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -25,7 +26,7 @@ const HomeScreen = ({ navigation }) => {
       console.log('Username:', uid);
 
       // Send a POST request to your backend to save the user's "Start Today" click
-      await axios.post('http://192.168.68.63:5000/start-today', { uid });
+      await axios.post('http://192.168.68.77:5000/start-today', { uid });
 
       // Navigate to UserListScreen after success
       navigation.navigate('UserList');
@@ -37,18 +38,13 @@ const HomeScreen = ({ navigation }) => {
   return (
     <Tab.Navigator>
       {/* User List Tab */}
-      <Tab.Screen
+      {/* <Tab.Screen
         name="UserList"
         component={UserListScreen}
         options={{ tabBarLabel: 'User List' }}
-      />
+      /> */}
 
-      {/* Chat Tab */}
-      <Tab.Screen
-        name="Chats"
-        component={ChatListScreen}
-        options={{ tabBarLabel: 'Chats' }}
-      />
+
 
       {/* Welcome screen */}
       <Tab.Screen
@@ -77,6 +73,20 @@ const HomeScreen = ({ navigation }) => {
         )}
         options={{ tabBarLabel: 'Home' }}
       />
+
+      {/* Chat Tab */}
+      <Tab.Screen
+        name="Chats"
+        component={ChatListScreen}
+        options={{ tabBarLabel: 'Chats' }}
+      />
+
+      <Tab.Screen
+        name="ProfileEditScreen"
+        component={ProfileEditScreen}
+        options={{tabBarLabel:'Profile'}}
+      />
+
     </Tab.Navigator>
   );
 };

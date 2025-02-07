@@ -1,9 +1,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const multer = require('multer');
 const bodyParser = require('body-parser');
 require('dotenv').config();
-
+const router = express.Router();
 //socket.io
 
 
@@ -19,6 +20,23 @@ const io = socketIo(server);
 
 app.use(cors());
 app.use(bodyParser.json());
+
+
+
+app.use('/uploads', express.static('uploads')); // Serve images from 'uploads' folder
+
+// Multer Storage Configuration
+const storage = multer.diskStorage({
+  destination: './uploads/', // Save uploaded files in 'uploads' folder
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}_${file.originalname}`);
+  },
+});
+
+const upload = multer({ storage });
+
+
+
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -117,18 +135,18 @@ app.get('/get-users', async (req, res) => {
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Fetch users where:
-    // 1. clickedStartToday is true
-    // 2. dateJoined is within today
-    // 3. preferredLanguage and preferredSolvingTime match current user's profile
-    // 4. Exclude the current user's UID
-    const users = await User.find({
-      clickedStartToday: true,
-      dateJoined: { $gte: startOfDay, $lte: endOfDay },
-      preferredLanguage: currentUser.preferredLanguage,
-      preferredSolvingTime: currentUser.preferredSolvingTime,
-      uid: { $ne: uid }, // Exclude current user's UID
-    });
+    // Fetch users with profilePicUrl included
+    const users = await User.find(
+      {
+        clickedStartToday: true,
+        dateJoined: { $gte: startOfDay, $lte: endOfDay },
+        preferredLanguage: currentUser.preferredLanguage,
+        preferredSolvingTime: currentUser.preferredSolvingTime,
+        uid: { $ne: uid }, // Exclude current user's UID
+      },
+      'uid username profilePic' // Include profilePicUrl in response
+    );
+    
 
     res.status(200).send({ message: 'Users fetched successfully', users });
   } catch (err) {
@@ -136,6 +154,7 @@ app.get('/get-users', async (req, res) => {
     res.status(500).send({ message: 'Error fetching users', error: err.message });
   }
 });
+
 
 
 // =====================
@@ -278,33 +297,66 @@ app.get('/get-chat-users', async (req, res) => {
   }
 });
 
-app.post('/create-profile', async (req, res) => {
+// app.post('/create-profile', async (req, res) => {
+//   const { uid, preferredLanguage, preferredSolvingTime } = req.body;
+
+//   if (!uid || !preferredLanguage || !preferredSolvingTime) {
+//     return res.status(400).json({ message: 'Missing required fields' });
+//   }
+
+//   try {
+//     const existingUser = await User.findOne({ uid });
+
+//     if (existingUser) {
+//       existingUser.preferredLanguage = preferredLanguage;
+//       existingUser.preferredSolvingTime = preferredSolvingTime;
+//       await existingUser.save();
+//       return res.status(200).json({ message: 'Profile updated successfully', user: existingUser });
+//     }
+
+//     const newUser = new User({ uid, preferredLanguage, preferredSolvingTime });
+//     await newUser.save();
+//     res.status(201).json({ message: 'Profile created successfully', user: newUser });
+//   } catch (err) {
+//     console.error('Error saving profile:', err);
+//     res.status(500).json({ message: 'Error saving profile', error: err.message });
+//   }
+// });
+// Profile Creation API
+
+app.post('/create-profile', upload.single('profilePic'), async (req, res) => {
   const { uid, preferredLanguage, preferredSolvingTime } = req.body;
 
-  if (!uid || !preferredLanguage || !preferredSolvingTime) {
+  if (!uid || !preferredLanguage || !preferredSolvingTime || !req.file) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
   try {
+    const profilePicUrl = `http://192.168.68.65:5000/uploads/${req.file.filename}`;
     const existingUser = await User.findOne({ uid });
-
     if (existingUser) {
-      existingUser.preferredLanguage = preferredLanguage;
-      existingUser.preferredSolvingTime = preferredSolvingTime;
-      await existingUser.save();
-      return res.status(200).json({ message: 'Profile updated successfully', user: existingUser });
-    }
+            existingUser.preferredLanguage = preferredLanguage;
+            existingUser.preferredSolvingTime = preferredSolvingTime;
+            existingUser.profilePic=profilePicUrl;
+            await existingUser.save();
+            return res.status(200).json({ message: 'Profile updated successfully', user: existingUser });
+          }
+    const newUser = new User({
+      uid,
+      preferredLanguage,
+      preferredSolvingTime,
+      profilePic: profilePicUrl,
+    });
 
-    const newUser = new User({ uid, preferredLanguage, preferredSolvingTime });
     await newUser.save();
-    res.status(201).json({ message: 'Profile created successfully', user: newUser });
+    res.status(200).json({ message: 'Profile created successfully', user: newUser });
   } catch (err) {
-    console.error('Error saving profile:', err);
-    res.status(500).json({ message: 'Error saving profile', error: err.message });
+    console.error('Error creating profile:', err);
+    res.status(500).json({ message: 'Error creating profile', error: err.message });
   }
 });
 
-app.put('/update-profile', async (req, res) => {
+app.put('/update-profile', upload.single('profilePic'), async (req, res) => {
   const { uid, username, preferredLanguage, preferredSolvingTime } = req.body;
 
   if (!uid || !username || !preferredLanguage || !preferredSolvingTime) {
@@ -312,24 +364,97 @@ app.put('/update-profile', async (req, res) => {
   }
 
   try {
-    const updatedUser = await User.findOneAndUpdate(
-      { uid }, // Find user by UID
-      { username, preferredLanguage, preferredSolvingTime },
-      { new: true, upsert: false } // Do not create a new user if not found
-    );
+    const updatedFields = {
+      username,
+      preferredLanguage,
+      preferredSolvingTime,
+    };
 
-    if (!updatedUser) {
+    if (req.file) {
+      const profilePicUrl = `http://192.168.68.65:5000/uploads/${req.file.filename}`;
+      updatedFields.profilePic = profilePicUrl;
+    }
+
+    const existingUser = await User.findOne({ uid });
+
+    if (!existingUser) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.status(200).json({ message: 'Profile updated successfully', user: updatedUser });
+    // Update user profile with new values
+    existingUser.username = username;
+    existingUser.preferredLanguage = preferredLanguage;
+    existingUser.preferredSolvingTime = preferredSolvingTime;
+
+    // Only update profile picture if it's provided
+    if (updatedFields.profilePic) {
+      existingUser.profilePic = updatedFields.profilePic;
+    }
+
+    await existingUser.save();
+
+    res.status(200).json({ message: 'Profile updated successfully', user: existingUser });
   } catch (err) {
     console.error('Error updating profile:', err);
     res.status(500).json({ message: 'Error updating profile', error: err.message });
   }
 });
 
+
+
+// app.put('/update-profile', async (req, res) => {
+//   const { uid, username, preferredLanguage, preferredSolvingTime } = req.body;
+
+//   if (!uid || !username || !preferredLanguage || !preferredSolvingTime) {
+//     return res.status(400).json({ message: 'Missing required fields' });
+//   }
+
+//   try {
+//     const updatedUser = await User.findOneAndUpdate(
+//       { uid }, // Find user by UID
+//       { username, preferredLanguage, preferredSolvingTime },
+//       { new: true, upsert: false } // Do not create a new user if not found
+//     );
+
+//     if (!updatedUser) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
+
+//     res.status(200).json({ message: 'Profile updated successfully', user: updatedUser });
+//   } catch (err) {
+//     console.error('Error updating profile:', err);
+//     res.status(500).json({ message: 'Error updating profile', error: err.message });
+//   }
+// });
+
 // API endpoint to fetch user details by UID
+
+
+// router.put('/update-profile', upload.single('profilePic'), async (req, res) => {
+//   const { uid, username, preferredLanguage, preferredSolvingTime } = req.body;
+//   const profilePicUrl = req.file ? `/uploads/${req.file.filename}` : null; // Save the profile picture URL
+//   console.log("cameinside")
+//   if (!uid || !username || !preferredLanguage || !preferredSolvingTime) {
+//     return res.status(400).json({ message: 'Missing required fields' });
+//   }
+
+//   try {
+//     const updateFields = { username, preferredLanguage, preferredSolvingTime };
+//     if (profilePicUrl) updateFields.profilePic = profilePicUrl; // Update profilePic if new image is uploaded
+
+//     const updatedUser = await User.findOneAndUpdate({ uid }, updateFields, { new: true });
+
+//     if (!updatedUser) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
+
+//     res.status(200).json({ message: 'Profile updated successfully', user: updatedUser });
+//   } catch (err) {
+//     console.error('Error updating profile:', err);
+//     res.status(500).json({ message: 'Error updating profile', error: err.message });
+//   }
+// });
+
 app.get('/user/:uid', async (req, res) => {
   const { uid } = req.params;
 
@@ -350,6 +475,38 @@ app.get('/user/:uid', async (req, res) => {
     res.status(500).json({ message: 'Error fetching user data', error: err.message });
   }
 });
+
+//update profile pic
+// router.put('/update-profile-pic', upload.single('profilePic'), async (req, res) => {
+//   const { uid } = req.body;
+//   console.log(uid)
+
+//   if (!uid || !req.file) {
+//     return res.status(400).send({ message: 'Missing UID or file' });
+//   }
+
+//   try {
+//     const imageUrl = `http://192.168.68.65:5000/uploads/${req.file.filename}`;
+//     //console.log(imageUrl)
+
+//     const updatedUser = await User.findOneAndUpdate(
+//       { uid },
+//       { profilePic: imageUrl },
+//       // { new: true }
+//     );
+
+//     if (!updatedUser) {
+//       return res.status(404).send({ message: 'User not found' });
+//     }
+
+//     res.status(200).send({ message: 'Profile picture updated', profilePic: updatedUser.profilePic });
+//   } catch (err) {
+//     console.error('Error updating profile picture:', err);
+//     res.status(500).send({ message: 'Error updating profile picture', error: err.message });
+//   }
+// });
+
+
 
 
 

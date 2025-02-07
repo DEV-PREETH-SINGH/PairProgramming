@@ -20,7 +20,7 @@ console.log(currentUserUID)
       }
 
       try {
-        const response = await axios.get('http://192.168.68.77:5000/get-chat-users', {
+        const response = await axios.get('http://192.168.68.65:5000/get-chat-users', {
           params: { uid: currentUserUID }
         });
         console.log(currentUserUID)

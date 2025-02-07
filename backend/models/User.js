@@ -32,6 +32,11 @@ const UserSchema = new mongoose.Schema({
     type: String, 
     
   },
+  profilePic: { 
+    type: String, 
+    
+  
+  }, // Store image URL
 });
 
 // Create a User model based on the updated schema

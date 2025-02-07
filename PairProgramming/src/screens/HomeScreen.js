@@ -26,7 +26,7 @@ const HomeScreen = ({ navigation }) => {
       console.log('Username:', uid);
 
       // Send a POST request to your backend to save the user's "Start Today" click
-      await axios.post('http://192.168.68.77:5000/start-today', { uid });
+      await axios.post('http://192.168.68.65:5000/start-today', { uid });
 
       // Navigate to UserListScreen after success
       navigation.navigate('UserList');

@@ -19,7 +19,7 @@ const ChatScreen = ({ route, navigation }) => {
     const fetchMessages = async () => {
       try {
         console.log(currentUserUID,extractedOtherUserUID)
-        const response = await axios.get('http://192.168.68.65:5000/api/messages/get-messages', {
+        const response = await axios.get('http://192.168.67.29:5000/api/messages/get-messages', {
           params: { user1: currentUserUID, user2: extractedOtherUserUID },
         });
         // console.log(user1,user2);
@@ -65,7 +65,7 @@ const ChatScreen = ({ route, navigation }) => {
   
     try {
       // Send the message to the backend
-      const response = await axios.post('http://192.168.68.65:5000/api/messages/send-message', {
+      const response = await axios.post('http://192.168.67.29:5000/api/messages/send-message', {
         senderUID: currentUserUID,
         receiverUID: extractedOtherUserUID,
         message: messageText,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import auth from '@react-native-firebase/auth';
+import { googleSignIn, signIn } from '../services/authService'; // Import signIn function
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -8,7 +8,7 @@ const LoginScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setLoading(true);
     setError('');
 
@@ -18,23 +18,32 @@ const LoginScreen = ({ navigation }) => {
       return;
     }
 
-    auth()
-      .signInWithEmailAndPassword(email, password)
-      .then(() => {
-        setLoading(false);
-        console.log('User logged in');
-        navigation.replace('Home');
-      })
-      .catch((error) => {
-        setLoading(false);
-        if (error.code === 'auth/wrong-password') {
-          setError('Incorrect password.');
-        } else if (error.code === 'auth/user-not-found') {
-          setError('No user found with this email.');
-        } else {
-          setError('An error occurred. Please try again later.');
-        }
-      });
+    try {
+      await signIn(email, password);
+      setLoading(false);
+      console.log('User logged in');
+      navigation.replace('Home');
+    } catch (error) {
+      setLoading(false);
+      if (error.code === 'auth/wrong-password') {
+        setError('Incorrect password.');
+      } else if (error.code === 'auth/user-not-found') {
+        setError('No user found with this email.');
+      } else {
+        setError('An error occurred. Please try again later.');
+      }
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      await googleSignIn(navigation); // Call the googleSignIn function from authservice.js
+      //navigation.replace('ProfileCompletion');
+    } catch (error) {
+      setLoading(false);
+      setError('Google Sign-In failed. Please try again.');
+    }
   };
 
   return (
@@ -64,6 +73,11 @@ const LoginScreen = ({ navigation }) => {
 
       <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
         <Text style={styles.textLink}>Create an account</Text>
+      </TouchableOpacity>
+
+      {/* Google Sign-In Button */}
+      <TouchableOpacity onPress={handleGoogleSignIn} style={styles.googleButton}>
+        <Text style={styles.googleButtonText}>Login with Google</Text>
       </TouchableOpacity>
     </View>
   );
@@ -98,6 +112,18 @@ const styles = StyleSheet.create({
     color: '#0066cc',
     marginTop: 15,
     textDecorationLine: 'underline',
+  },
+  googleButton: {
+    marginTop: 20,
+    backgroundColor: '#4285F4', // Google blue color
+    padding: 10,
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+  },
+  googleButtonText: {
+    color: 'white',
+    fontSize: 16,
   },
 });
 

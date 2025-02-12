@@ -325,29 +325,26 @@ app.get('/get-chat-users', async (req, res) => {
 // Profile Creation API
 
 app.post('/create-profile', upload.single('profilePic'), async (req, res) => {
-  const { uid, preferredLanguage, preferredSolvingTime } = req.body;
-
-  if (!uid || !preferredLanguage || !preferredSolvingTime || !req.file) {
+  const { uid, username, email, preferredLanguage, preferredSolvingTime } = req.body;
+  console.log("username",username)
+  if (!username || !uid || !email || !preferredLanguage || !preferredSolvingTime || !req.file) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
   try {
-    const profilePicUrl = `http://192.168.68.65:5000/uploads/${req.file.filename}`;
-    const existingUser = await User.findOne({ uid });
-    if (existingUser) {
-            existingUser.preferredLanguage = preferredLanguage;
-            existingUser.preferredSolvingTime = preferredSolvingTime;
-            existingUser.profilePic=profilePicUrl;
-            await existingUser.save();
-            return res.status(200).json({ message: 'Profile updated successfully', user: existingUser });
-          }
+    const profilePicUrl = `http://192.168.68.78:5000/uploads/${req.file.filename}`;
+  
     const newUser = new User({
       uid,
+      username,
+      email,
       preferredLanguage,
       preferredSolvingTime,
       profilePic: profilePicUrl,
     });
-
+    //console.log(existingUser)
+    //console.log("newuser:",newUser)
+    
     await newUser.save();
     res.status(200).json({ message: 'Profile created successfully', user: newUser });
   } catch (err) {
@@ -371,7 +368,7 @@ app.put('/update-profile', upload.single('profilePic'), async (req, res) => {
     };
 
     if (req.file) {
-      const profilePicUrl = `http://192.168.68.65:5000/uploads/${req.file.filename}`;
+      const profilePicUrl = `http://192.168.68.78:5000/uploads/${req.file.filename}`;
       updatedFields.profilePic = profilePicUrl;
     }
 
@@ -486,7 +483,7 @@ app.get('/user/:uid', async (req, res) => {
 //   }
 
 //   try {
-//     const imageUrl = `http://192.168.68.65:5000/uploads/${req.file.filename}`;
+//     const imageUrl = `http://192.168.68.78:5000/uploads/${req.file.filename}`;
 //     //console.log(imageUrl)
 
 //     const updatedUser = await User.findOneAndUpdate(

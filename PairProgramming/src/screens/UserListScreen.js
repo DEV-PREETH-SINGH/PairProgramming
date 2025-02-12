@@ -16,7 +16,7 @@ const UserListScreen = ({ navigation }) => {
         }
 
         console.log(currentUserUID)
-        const response = await axios.get(`http://192.168.68.65:5000/get-users?uid=${currentUserUID}`);
+        const response = await axios.get(`http://192.168.67.29:5000/get-users?uid=${currentUserUID}`);
         setUsers(response.data.users);
       } catch (err) {
         setError('Error fetching user list');
@@ -40,6 +40,7 @@ const UserListScreen = ({ navigation }) => {
   };
 
   return (
+    
     <View style={styles.container}>
       <Text style={styles.text}>User List for Today</Text>
       {users.length > 0 ? (
@@ -61,6 +62,7 @@ const UserListScreen = ({ navigation }) => {
         <Text style={styles.text}>No users have clicked "Start Today" yet.</Text>
       )}
     </View>
+
   );
 };
 

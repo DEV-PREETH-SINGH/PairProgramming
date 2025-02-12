@@ -20,7 +20,7 @@ const ProfileEditScreen = ({ navigation }) => {
     const fetchUserData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`http://192.168.68.65:5000/user/${currentUserUID}`);
+        const response = await axios.get(`http://192.168.67.29:5000/user/${currentUserUID}`);
         const { username, preferredLanguage, preferredSolvingTime, profilePic } = response.data;
 
         setUsername(username || '');
@@ -73,7 +73,7 @@ const ProfileEditScreen = ({ navigation }) => {
         });
       }
 
-      await axios.put(`http://192.168.68.65:5000/update-profile`, formData, {
+      await axios.put(`http://192.168.67.29:5000/update-profile`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
@@ -128,6 +128,13 @@ const ProfileEditScreen = ({ navigation }) => {
       </Picker>
 
       <Button title="Update Profile" onPress={handleUpdateProfile} disabled={loading} />
+      <Button
+              title="Log out"
+              onPress={() => {
+                auth().signOut(); // Sign out the user
+                navigation.replace('Login'); // Redirect to the login screen
+              }}
+            />
     </View>
   );
 };

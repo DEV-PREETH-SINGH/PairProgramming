@@ -1,4 +1,3 @@
-// HomeScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, Button, StyleSheet, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -7,6 +6,7 @@ import auth from '@react-native-firebase/auth';
 import UserListScreen from './UserListScreen'; // Import UserListScreen
 import ChatListScreen from './ChatListScreen'; // Import ChatScreen
 import ProfileEditScreen from './ProfileEditScreen';
+import LinearGradient from 'react-native-linear-gradient'; // Import LinearGradient
 
 const Tab = createBottomTabNavigator();
 
@@ -26,7 +26,7 @@ const HomeScreen = ({ navigation }) => {
       console.log('Username:', uid);
 
       // Send a POST request to your backend to save the user's "Start Today" click
-      await axios.post('http://192.168.68.65:5000/start-today', { uid });
+      await axios.post('http://192.168.67.29:5000/start-today', { uid });
 
       // Navigate to UserListScreen after success
       navigation.navigate('UserList');
@@ -37,21 +37,17 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <Tab.Navigator>
-      {/* User List Tab */}
-      {/* <Tab.Screen
-        name="UserList"
-        component={UserListScreen}
-        options={{ tabBarLabel: 'User List' }}
-      /> */}
-
-
-
       {/* Welcome screen */}
       <Tab.Screen
         name="Welcome"
         component={() => (
-          <View style={styles.container}>
-            <Text style={styles.header}>Welcome to the Home Screen, {uid}!</Text>
+          <LinearGradient
+          colors={['rgba(182, 214, 201, 0.5)', '#d6cfaa', 'rgba(234, 194, 146, 0.7)']} // Reduced opacity for the first and third colors
+          start={{ x: 0, y: 0 }}  // Gradient starts from the top-left
+            end={{ x: 1, y: 1 }}    // Gradient ends at the bottom-right
+            style={styles.container}
+          >
+            <Text style={styles.header}>Welcome</Text>
 
             {/* Log out button */}
             <Button
@@ -69,7 +65,7 @@ const HomeScreen = ({ navigation }) => {
             >
               <Text style={styles.startTodayText}>Start Today</Text>
             </TouchableOpacity>
-          </View>
+          </LinearGradient>
         )}
         options={{ tabBarLabel: 'Home' }}
       />
@@ -84,9 +80,8 @@ const HomeScreen = ({ navigation }) => {
       <Tab.Screen
         name="ProfileEditScreen"
         component={ProfileEditScreen}
-        options={{tabBarLabel:'Profile'}}
+        options={{ tabBarLabel: 'Profile' }}
       />
-
     </Tab.Navigator>
   );
 };
@@ -102,6 +97,7 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: '#fff', // Ensure text is visible on the gradient background
   },
   startTodayButton: {
     marginTop: 20,

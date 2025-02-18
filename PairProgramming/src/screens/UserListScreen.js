@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Button, StyleSheet, Image } from 'react-native';
+import { View, Text, FlatList, Button, StyleSheet, Image ,TouchableOpacity} from 'react-native';
 import axios from 'axios';
 import auth from '@react-native-firebase/auth';
+
+
+import { ChevronLeft,MessageCircle } from 'lucide-react-native';
 
 const UserListScreen = ({ navigation }) => {
   const [users, setUsers] = useState([]);
@@ -16,12 +19,13 @@ const UserListScreen = ({ navigation }) => {
         }
 
         console.log(currentUserUID)
-        const response = await axios.get(`http://192.168.67.29:5000/get-users?uid=${currentUserUID}`);
+        const response = await axios.get(`http://192.168.68.50:5000/get-users?uid=${currentUserUID}`);
         setUsers(response.data.users);
       } catch (err) {
         setError('Error fetching user list');
         console.error(err);
       }
+      
     };
 
     fetchUserList();
@@ -40,9 +44,18 @@ const UserListScreen = ({ navigation }) => {
   };
 
   return (
-    
     <View style={styles.container}>
-      <Text style={styles.text}>User List for Today</Text>
+      {/* Top Bar with Back Button */}
+      <View style={styles.topBar}>
+        <ChevronLeft 
+          
+          size={30}
+          color="#aaa"
+          onPress={() => navigation.goBack()} // Navigate to the previous screen
+        />
+        <Text style={styles.heading}>CodeBuddies for Today</Text>
+      </View>
+
       {users.length > 0 ? (
         <FlatList
           data={users}
@@ -54,22 +67,47 @@ const UserListScreen = ({ navigation }) => {
                 style={styles.profilePic}
               />
               <Text style={styles.userText}>{item.username}</Text>
-              <Button title="Chat" onPress={() => handleChatPress(item.uid)} />
+              <TouchableOpacity 
+                style={styles.chatButton}
+                onPress={() => handleChatPress(item.uid)}
+              >
+                <MessageCircle size={20} color="#000" />
+              </TouchableOpacity>
             </View>
           )}
         />
       ) : (
-        <Text style={styles.text}>No users have clicked "Start Today" yet.</Text>
+        <View style={styles.noUsersContainer}>
+        <Image
+            source={require('../assets/No_user.jpg')} // Replace with your image URL
+            style={styles.emptyImage}
+          />
+          <Text style={styles.noUsersText}>Looks like the place is empty, </Text>
+          <Text style={styles.noUsersText}>check back soon.</Text>
+        </View>
       )}
     </View>
-
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor:'white',
     flex: 1,
     padding: 20,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  heading: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginLeft: 10,
+    paddingRight:50,
+    flex: 1,
+    textAlign: 'center',
   },
   text: {
     fontSize: 20,
@@ -93,6 +131,21 @@ const styles = StyleSheet.create({
   userText: {
     fontSize: 18,
     flex: 1,
+  },
+  noUsersContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyImage: {
+    width: 150,
+    height: 150,
+    marginBottom: 20,
+  },
+  noUsersText: {
+    fontSize: 16,
+    color: 'gray',
+    textAlign: 'center',
   },
 });
 

@@ -40,16 +40,17 @@ const AppNavigator = () => {
 
   return (
     <Stack.Navigator initialRouteName={initialRoute}>
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="UserList" component={UserListScreen} />
-      <Stack.Screen name="Chat" component={ChatScreen} />
-      <Stack.Screen name="ChatList" component={ChatListScreen} />
-      <Stack.Screen name="ProfileCompletion" component={ProfileCompletionScreen} />
-      <Stack.Screen name="ProfileEditScreen" component={ProfileEditScreen} />
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Signup" component={SignupScreen} />
+      <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="UserList" component={UserListScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ChatList" component={ChatListScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ProfileCompletion" component={ProfileCompletionScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ProfileEditScreen" component={ProfileEditScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Signup" component={SignupScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
+  
 };
 
 export default AppNavigator;

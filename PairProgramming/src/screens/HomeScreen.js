@@ -1,34 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import axios from 'axios';
 import auth from '@react-native-firebase/auth';
-import UserListScreen from './UserListScreen'; // Import UserListScreen
-import ChatListScreen from './ChatListScreen'; // Import ChatScreen
+import UserListScreen from './UserListScreen';
+import ChatListScreen from './ChatListScreen';
 import ProfileEditScreen from './ProfileEditScreen';
-import LinearGradient from 'react-native-linear-gradient'; // Import LinearGradient
+import { House, MessageCircle, UserRoundPen } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
 
 const HomeScreen = ({ navigation }) => {
-  const [uid, setUsername] = useState('Guest');
+  const [uid, setUid] = useState('Guest');
+  const [usersTodayCount, setUsersTodayCount] = useState(0); // Added state for count
 
-  // Fetch the current user information
   useEffect(() => {
     const user = auth().currentUser;
     if (user) {
-      setUsername(user.uid || 'Guest');
+      setUid(user.uid || 'Guest');
     }
+
+    // Fetch the number of users who started today
+    fetchUsersTodayCount();
   }, []);
+
+  const fetchUsersTodayCount = async () => {
+    try {
+      const response = await axios.get('http://192.168.68.50:5000/count-start-today');
+      setUsersTodayCount(response.data.count); // Update the count
+      console.log(response.data.count);
+    } catch (error) {
+      console.error('Error fetching users today count:', error);
+    }
+
+  };
 
   const handleStartToday = async () => {
     try {
       console.log('Username:', uid);
-
-      // Send a POST request to your backend to save the user's "Start Today" click
-      await axios.post('http://192.168.67.29:5000/start-today', { uid });
-
-      // Navigate to UserListScreen after success
+      await axios.post('http://192.168.68.50:5000/start-today', { uid });
+      fetchUsersTodayCount(); // Refresh count after pressing the button
       navigation.navigate('UserList');
     } catch (error) {
       console.error('Error sending user data:', error);
@@ -36,51 +47,52 @@ const HomeScreen = ({ navigation }) => {
   };
 
   return (
-    <Tab.Navigator>
-      {/* Welcome screen */}
+    <Tab.Navigator
+      screenOptions={{
+        tabBarStyle: styles.tabBar,
+        tabBarShowLabel: false, // Remove labels
+      }}
+    >
       <Tab.Screen
-        name="Welcome"
+        name="Home"
         component={() => (
-          <LinearGradient
-          colors={['rgba(182, 214, 201, 0.5)', '#d6cfaa', 'rgba(234, 194, 146, 0.7)']} // Reduced opacity for the first and third colors
-          start={{ x: 0, y: 0 }}  // Gradient starts from the top-left
-            end={{ x: 1, y: 1 }}    // Gradient ends at the bottom-right
-            style={styles.container}
-          >
-            <Text style={styles.header}>Welcome</Text>
-
-            {/* Log out button */}
-            <Button
-              title="Log out"
-              onPress={() => {
-                auth().signOut(); // Sign out the user
-                navigation.replace('Login'); // Redirect to the login screen
-              }}
-            />
-
-            {/* Start Today Button */}
+          <View style={styles.container}>
+            <Text style={styles.heading}>Welcome to Code Buddy</Text>
+            <Text style={styles.text}>Ready to solve problems with your coding partner?</Text>
+            
             <TouchableOpacity
               style={styles.startTodayButton}
-              onPress={handleStartToday} // Call handleStartToday when pressed
+              onPress={handleStartToday}
             >
               <Text style={styles.startTodayText}>Start Today</Text>
             </TouchableOpacity>
-          </LinearGradient>
+
+            {/* Show number of users who started today */}
+            <Text style={styles.usersTodayText}>
+              {usersTodayCount} user(s) have started today
+            </Text>
+          </View>
         )}
-        options={{ tabBarLabel: 'Home' }}
+        options={{
+          // headerShown: false,
+          tabBarIcon: ({ color, size }) => <House size={20} color="#000" />,
+        }}
       />
 
-      {/* Chat Tab */}
       <Tab.Screen
         name="Chats"
         component={ChatListScreen}
-        options={{ tabBarLabel: 'Chats' }}
+        options={{
+          tabBarIcon: ({ color, size }) => <MessageCircle size={20} color="#000" />,
+        }}
       />
 
       <Tab.Screen
-        name="ProfileEditScreen"
+        name="Profile"
         component={ProfileEditScreen}
-        options={{ tabBarLabel: 'Profile' }}
+        options={{
+          tabBarIcon: ({ color, size }) => <UserRoundPen size={20} color="#000" />,
+        }}
       />
     </Tab.Navigator>
   );
@@ -92,24 +104,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    // backgroundColor: 'white',
   },
-  header: {
-    fontSize: 30,
+  heading: {
+    fontSize: 27,
     fontWeight: 'bold',
+    color: 'black',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  text: {
+    fontSize: 18,
+    // fontWeight: 'bold',
+    color: 'black',
+    textAlign: 'center',
     marginBottom: 20,
-    color: '#fff', // Ensure text is visible on the gradient background
   },
   startTodayButton: {
-    marginTop: 20,
-    backgroundColor: '#0066cc',
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: 'black',
+    padding: 15,
+    borderRadius: 8,
     alignItems: 'center',
     width: '100%',
   },
   startTodayText: {
     color: 'white',
     fontSize: 18,
+  },
+  usersTodayText: {
+    marginTop: 10, // Space between button and text
+    fontSize: 16,
+    color: 'gray',
+    // fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  tabBar: {
+    backgroundColor: 'white',
+    paddingTop:'5',
+    // marginBottom: 15,
+    // marginHorizontal: 15,
+    // borderRadius: 20,
+    // elevation: 5,
+    // borderWidth: 2, // Border thickness
+    // borderColor: 'gray', // Border color
   },
 });
 

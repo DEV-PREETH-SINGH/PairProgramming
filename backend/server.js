@@ -6,7 +6,7 @@ const bodyParser = require('body-parser');
 require('dotenv').config();
 const router = express.Router();
 //socket.io
-
+const moment = require('moment');
 
 const app = express();
 
@@ -112,6 +112,28 @@ app.post('/start-today', async (req, res) => {
   }
 });
 
+app.get('/count-start-today', async (req, res) => {
+  try {
+    // Get the start and end of today
+    const todayStart = moment().startOf('day').toDate();
+    const todayEnd = moment().endOf('day').toDate();
+
+    // Count users who clicked the "start" button today
+    const count = await User.countDocuments({
+      clickedStartToday: true,  // Ensure the "start" button was clicked
+      dateJoined: { $gte: todayStart, $lt: todayEnd },  // Filter users who joined today
+    });
+
+    console.log(count)
+
+    res.status(200).send({ count });  // Send the count as a response
+  } catch (err) {
+    console.error('Error fetching start today count:', err);
+    res.status(500).send({ message: 'Error fetching start today count', error: err.message });
+  }
+});
+
+
 // Get users who clicked "Start Today" on the current day, excluding the current user
 // server.js (Backend)
 app.get('/get-users', async (req, res) => {
@@ -155,7 +177,30 @@ app.get('/get-users', async (req, res) => {
   }
 });
 
+// Route to fetch user data by UID
+app.get('/api/users/get-username', async (req, res) => {
+  const { userUID } = req.query;
 
+  if (!userUID) {
+    return res.status(400).json({ error: 'User UID is required' });
+  }
+
+  try {
+    // Find user by UID
+    const user = await User.findOne({ uid: userUID });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    console.log("hi");
+    console.log(user.username);
+    // Send user data as response
+    res.status(200).json({ username: user.username });
+  } catch (err) {
+    console.error('Error fetching user data:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // =====================
 // Messaging Endpoints
@@ -282,20 +327,40 @@ app.get('/get-chat-users', async (req, res) => {
         }
       },
       {
-        $project: { _id: 1 } // Project only the user IDs
+        $lookup: {
+          from: 'users', // Assuming the user collection is called 'users'
+          localField: '_id',
+          foreignField: 'uid', // Assuming the field in the users collection that holds the user ID is 'uid'
+          as: 'userDetails'
+        }
+      },
+      {
+        $unwind: {
+          path: "$userDetails",
+          preserveNullAndEmptyArrays: true // This will preserve users even if they don't have a corresponding entry in the 'users' collection
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          username: "$userDetails.username", // Project the username
+          profilePic: "$userDetails.profilePic" // Project the profilePic URL or path
+        }
       }
     ]);
 
     if (chatUsers.length === 0) {
-      return res.status(404).send('No chat users found');
+      return res.status(200).json([]); // Return an empty array if no chat users
     }
 
-    res.json(chatUsers); // Send the list of users to the frontend
+    res.json(chatUsers); // Send the list of users with usernames and profile pics to the frontend
   } catch (error) {
     console.error('Error fetching chat users:', error);
     res.status(500).send('Server error');
   }
 });
+
+
 
 // app.post('/create-profile', async (req, res) => {
 //   const { uid, preferredLanguage, preferredSolvingTime } = req.body;
@@ -332,7 +397,7 @@ app.post('/create-profile', upload.single('profilePic'), async (req, res) => {
   }
 
   try {
-    const profilePicUrl = `http://192.168.68.78:5000/uploads/${req.file.filename}`;
+    const profilePicUrl = `http://192.168.68.50:5000/uploads/${req.file.filename}`;
   
     const newUser = new User({
       uid,
@@ -368,7 +433,7 @@ app.put('/update-profile', upload.single('profilePic'), async (req, res) => {
     };
 
     if (req.file) {
-      const profilePicUrl = `http://192.168.68.78:5000/uploads/${req.file.filename}`;
+      const profilePicUrl = `http://192.168.68.50:5000/uploads/${req.file.filename}`;
       updatedFields.profilePic = profilePicUrl;
     }
 
@@ -483,7 +548,7 @@ app.get('/user/:uid', async (req, res) => {
 //   }
 
 //   try {
-//     const imageUrl = `http://192.168.68.78:5000/uploads/${req.file.filename}`;
+//     const imageUrl = `http://192.168.68.50:5000/uploads/${req.file.filename}`;
 //     //console.log(imageUrl)
 
 //     const updatedUser = await User.findOneAndUpdate(

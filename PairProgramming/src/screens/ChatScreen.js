@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, TextInput, Button } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TextInput, Button, TouchableOpacity } from 'react-native';
 import axios from 'axios';
 import auth from '@react-native-firebase/auth';
+import { ChevronLeft,Send } from 'lucide-react-native';
 
 const ChatScreen = ({ route, navigation }) => {
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState(null);
   const [messageText, setMessageText] = useState('');
+  const [otherUserName, setOtherUserName] = useState('');
+
 
   const currentUserUID = auth().currentUser?.uid;
   const { otherUserUID } = route.params;
@@ -16,18 +19,33 @@ const ChatScreen = ({ route, navigation }) => {
   const chatContainerRef = useRef();  // Reference for auto-scrolling
 
   useEffect(() => {
+    const fetchOtherUserName = async () => {
+      try {
+        const response = await axios.get('http://192.168.68.50:5000/api/users/get-username', {
+          params: { userUID: extractedOtherUserUID }
+        });
+        setOtherUserName(response.data.username);
+        console.log(response.data.username);
+        console.log(extractedOtherUserUID);
+        //console.log(data);// Assuming response contains a 'name' field
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+      }
+    };
+
+    fetchOtherUserName();
+  }, [extractedOtherUserUID]);
+
+//console.log(otherUserName)
+  useEffect(() => {
     const fetchMessages = async () => {
       try {
-        console.log(currentUserUID,extractedOtherUserUID)
-        const response = await axios.get('http://192.168.67.29:5000/api/messages/get-messages', {
+        const response = await axios.get('http://192.168.68.50:5000/api/messages/get-messages', {
           params: { user1: currentUserUID, user2: extractedOtherUserUID },
         });
-        // console.log(user1,user2);
         const validMessages = response.data.messages?.filter(
           (msg) => msg.senderUID && msg.message
         ) || [];
-
-        console.log('Fetched messages:', validMessages);  // Log fetched messages
 
         setMessages(validMessages);
 
@@ -38,18 +56,16 @@ const ChatScreen = ({ route, navigation }) => {
 
       } catch (err) {
         setError('Error fetching messages');
-        console.error('Error fetching messages:', err);
       }
     };
 
     fetchMessages();
-  }, [currentUserUID, extractedOtherUserUID]); // Dependency array to trigger fetch when UIDs change
+  }, [currentUserUID, extractedOtherUserUID]); 
 
   // Handle sending a message
   const handleSendMessage = async () => {
     if (messageText.trim() === '') return; // Prevent sending empty messages
   
-    // Create a temporary message for optimistic UI updates
     const tempMessage = {
       _id: new Date().toISOString(), // Temporary ID to uniquely identify the message
       senderUID: currentUserUID,
@@ -58,35 +74,25 @@ const ChatScreen = ({ route, navigation }) => {
       timestamp: new Date().toISOString(),
       isTemp: true, // Mark this as temporary
     };
-  
-    // Update the UI immediately with the temporary message
+
     setMessages((prevMessages) => [...prevMessages, tempMessage]);
     setMessageText(''); // Clear the input field
-  
+
     try {
-      // Send the message to the backend
-      const response = await axios.post('http://192.168.67.29:5000/api/messages/send-message', {
+      const response = await axios.post('http://192.168.68.50:5000/api/messages/send-message', {
         senderUID: currentUserUID,
         receiverUID: extractedOtherUserUID,
         message: messageText,
       });
-  
+
       if (response.status === 201) {
-        const savedMessage = response.data.data; // Access saved message from the response
-  
-        // Replace the temporary message with the backend-confirmed message
-        // setMessages((prevMessages) =>
-        //   prevMessages.map((msg) =>
-        //     msg.isTemp && msg._id === tempMessage._id ? savedMessage : msg
-        //   )
-        // );
+        const savedMessage = response.data.data;
       } else {
         throw new Error('Failed to send message');
       }
     } catch (err) {
       console.error('Error sending message:', err);
-  
-      // Mark the temporary message as failed
+
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
           msg.isTemp && msg._id === tempMessage._id
@@ -94,21 +100,16 @@ const ChatScreen = ({ route, navigation }) => {
             : msg
         )
       );
-  
+
       setError('Failed to send message');
     }
   };
-  
+
   const RenderMessageItem = React.memo(({ item }) => {
-    // Log the item to see if it's valid
-    console.log('Rendering message item:', item);
-  
-    // Check if the item is valid
     if (!item || !item.message || !item.senderUID || item.message === '') {
-      console.error("Invalid message item:", item); // Log invalid item
       return null; // Skip rendering if the item is invalid
     }
-  
+
     return (
       <View
         style={[
@@ -120,16 +121,20 @@ const ChatScreen = ({ route, navigation }) => {
       </View>
     );
   });
-  
-  
 
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>Chat with {extractedOtherUserUID}</Text>
+      {/* Top Bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <ChevronLeft size={30} color="#aaa" />
+        </TouchableOpacity>
+        <Text style={styles.chatHeader}>Chat with {otherUserName}</Text>
+      </View>
 
       {/* Message list */}
-      <FlatList
-        ref={chatContainerRef} // Reference for auto-scrolling
+      <FlatList style={styles.renderingMessageBox}
+        ref={chatContainerRef} 
         data={messages}
         keyExtractor={(item, index) => index.toString()}
         renderItem={({ item }) => <RenderMessageItem item={item} />}
@@ -139,52 +144,86 @@ const ChatScreen = ({ route, navigation }) => {
       />
 
       {/* Input and Send Button */}
-      <TextInput
-        style={styles.input}
-        value={messageText}
-        onChangeText={setMessageText}
-        placeholder="Type a message..."
-      />
-      <Button title="Send" onPress={handleSendMessage} />
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          value={messageText}
+          onChangeText={setMessageText}
+          placeholder="Type a message..."
+        />
+        <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
+          <Send  size={24} color="#949494" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor:'white',
     flex: 1,
     justifyContent: 'flex-end',
-    padding: 10,
+    // padding: 20,
   },
-  text: {
-    fontSize: 20,
+  topBar: {
+    padding:20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom:15,
+    backgroundColor: 'white',
+    marginBottom:20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+    
+  },
+  renderingMessageBox:{
+    padding:10,
+  },
+  chatHeader: {
+  fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginLeft: 10,
+    paddingRight:50,
+    flex: 1,
+    textAlign: 'center',
   },
   messageItem: {
     padding: 10,
     marginBottom: 10,
     borderRadius: 10,
     maxWidth: '80%',
+    backgroundColor: 'grey', // Updated to grey background
   },
   sentMessage: {
-    backgroundColor: '#cce5ff',
     alignSelf: 'flex-end',
+    backgroundColor: '#d6d6d6',
   },
   receivedMessage: {
-    backgroundColor: '#f1f1f1',
     alignSelf: 'flex-start',
+    backgroundColor: '#d6d6d6',
   },
   messageText: {
     fontSize: 16,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
   },
   input: {
     height: 40,
     borderColor: '#ccc',
     borderWidth: 1,
     borderRadius: 5,
+    flex: 0.8, // Takes up 80% of the width
     paddingLeft: 10,
-    marginBottom: 10,
+  },
+  sendButton: {
+    flex: 0.2, // Takes up 20% of the width
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
   },
 });
 

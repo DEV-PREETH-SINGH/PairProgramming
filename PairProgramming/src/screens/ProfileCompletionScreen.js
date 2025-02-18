@@ -51,7 +51,7 @@ const ProfileCompletionScreen = () => {
       console.log(preferredLanguage)
       console.log(preferredSolvingTime)
 
-      const response = await axios.post('http://192.168.67.29:5000/create-profile', formData, {
+      const response = await axios.post('http://192.168.68.50:5000/create-profile', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
@@ -91,6 +91,7 @@ const ProfileCompletionScreen = () => {
           style={styles.picker}
           onValueChange={setPreferredLanguage}
         >
+         <Picker.Item label="Select Programming Language" value={null} />
           <Picker.Item label="C" value="C" />
           <Picker.Item label="C++" value="C++" />
           <Picker.Item label="PYTHON" value="PYTHON" />
@@ -103,6 +104,7 @@ const ProfileCompletionScreen = () => {
           style={styles.picker}
           onValueChange={setPreferredSolvingTime}
         >
+         <Picker.Item label="Select Preferred Coding Time" value={null} />
           <Picker.Item label="Morning" value="Morning" />
           <Picker.Item label="Afternoon" value="Afternoon" />
           <Picker.Item label="Evening" value="Evening" />
@@ -178,20 +180,21 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   button: {
+    backgroundColor: '#000000',
     width: '100%',
-    backgroundColor: '#007AFF',
-    paddingVertical: 15,
-    borderRadius: 10,
+    paddingVertical: 20,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 10,
+    justifyContent: 'center',
+    marginBottom: 20,
   },
   buttonDisabled: {
     backgroundColor: '#A0A0A0',
   },
   buttonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    // fontSize: 18,
+    // fontWeight: 'bold',
   },
 });
 

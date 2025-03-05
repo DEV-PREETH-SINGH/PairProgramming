@@ -1,3 +1,4 @@
+import {baseUrl} from "@env";
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet,Image } from 'react-native';
 import { googleSignIn, signIn } from '../services/authService';

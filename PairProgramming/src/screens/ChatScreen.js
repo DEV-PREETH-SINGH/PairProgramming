@@ -1,3 +1,4 @@
+import {baseUrl} from "@env";
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, FlatList, StyleSheet, TextInput, Button, TouchableOpacity } from 'react-native';
 import axios from 'axios';
@@ -21,7 +22,7 @@ const ChatScreen = ({ route, navigation }) => {
   useEffect(() => {
     const fetchOtherUserName = async () => {
       try {
-        const response = await axios.get('http://192.168.68.50:5000/api/users/get-username', {
+        const response = await axios.get(`${baseUrl}/api/users/get-username`, {
           params: { userUID: extractedOtherUserUID }
         });
         setOtherUserName(response.data.username);
@@ -40,7 +41,8 @@ const ChatScreen = ({ route, navigation }) => {
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        const response = await axios.get('http://192.168.68.50:5000/api/messages/get-messages', {
+        // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
+        const response = await axios.get(`${baseUrl}/api/messages/get-messages`, {
           params: { user1: currentUserUID, user2: extractedOtherUserUID },
         });
         const validMessages = response.data.messages?.filter(
@@ -79,7 +81,7 @@ const ChatScreen = ({ route, navigation }) => {
     setMessageText(''); // Clear the input field
 
     try {
-      const response = await axios.post('http://192.168.68.50:5000/api/messages/send-message', {
+      const response = await axios.post(`${baseUrl}/api/messages/send-message`, {
         senderUID: currentUserUID,
         receiverUID: extractedOtherUserUID,
         message: messageText,

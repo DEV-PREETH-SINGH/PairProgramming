@@ -1,3 +1,4 @@
+import {baseUrl} from "@env";
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import auth from '@react-native-firebase/auth';
@@ -27,7 +28,8 @@ const SignupScreen = ({ navigation }) => {
 
       // Step 2: Send the user data (username, email, uid) to the backend (MongoDB)
       console.log("1")
-      await axios.post('http://192.168.68.50:5000/signup', {
+      // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
+      await axios.post(`${baseUrl}/signup`, {
         username,
         email,
         uid: user.uid,

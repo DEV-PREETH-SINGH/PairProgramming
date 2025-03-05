@@ -1,10 +1,16 @@
-# Add project specific ProGuard rules here.
-# By default, the flags in this file are appended to flags specified
-# in /usr/local/Cellar/android-sdk/24.3.3/tools/proguard/proguard-android.txt
-# You can edit the include path and order by changing the proguardFiles
-# directive in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Retain essential networking libraries
+-keep class okhttp3.** { *; }
+-keep class com.google.gson.** { *; }
+-keep class retrofit2.** { *; }
+-keep class com.squareup.okhttp3.** { *; }
 
-# Add any project specific keep options here:
+# Prevent warnings for missing references
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
+-dontwarn com.google.gson.**
+
+# Allow debugging for better error messages
+-keepattributes Exceptions, InnerClasses, Signature, Annotation
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}

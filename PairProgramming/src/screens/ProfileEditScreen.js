@@ -1,3 +1,4 @@
+import {baseUrl} from "@env";
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, ActivityIndicator, Alert, Image, TouchableOpacity,Button } from 'react-native';
 import auth from '@react-native-firebase/auth';
@@ -20,7 +21,8 @@ const ProfileEditScreen = ({ navigation }) => {
     const fetchUserData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`http://192.168.68.50:5000/user/${currentUserUID}`);
+        // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
+        const response = await axios.get(`${baseUrl}/user/${currentUserUID}`);
         const { username, preferredLanguage, preferredSolvingTime, profilePic } = response.data;
 
         setUsername(username || '');
@@ -70,8 +72,8 @@ const ProfileEditScreen = ({ navigation }) => {
           type: 'image/jpeg',
         });
       }
-
-      await axios.put(`http://192.168.68.50:5000/update-profile`, formData, {
+      // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
+      await axios.put(`${baseUrl}/update-profile`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 

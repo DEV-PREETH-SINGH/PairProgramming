@@ -1,3 +1,8 @@
+import {PORT} from "@env";
+import {baseUrl} from "@env";
+
+console.log('PORT:',PORT);
+console.log('BASEURL',baseUrl);
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -7,6 +12,24 @@ import UserListScreen from './UserListScreen';
 import ChatListScreen from './ChatListScreen';
 import ProfileEditScreen from './ProfileEditScreen';
 import { House, MessageCircle, UserRoundPen } from 'lucide-react-native';
+console.log(PORT); // Output: http://example.com/api
+
+
+console.log('BASEURL',baseUrl);
+console.log('BASEURL',PORT);
+
+const fetchUsersTodayCount = async () => {
+  try {
+    // Use the imported BASE_URL variable
+    const response = await axios.get(`${BASE_URL}/count-start-today`);
+    setUsersTodayCount(response.data.count); // Update the count
+    console.log(response.data.count);
+  } catch (error) {
+    console.error('Error fetching users today count:', error);
+  }
+};
+
+
 
 const Tab = createBottomTabNavigator();
 
@@ -26,7 +49,12 @@ const HomeScreen = ({ navigation }) => {
 
   const fetchUsersTodayCount = async () => {
     try {
-      const response = await axios.get('http://192.168.68.50:5000/count-start-today');
+      // const baseUrl = baseUrl ; // Default to localhost for developmentconst 
+      console.log('THIS BASEURL',baseUrl,"/count-start-today");
+
+      const response = await axios.get(`${baseUrl}/count-start-today`);
+      console.log(baseUrl);
+      console.log(response.data.count);
       setUsersTodayCount(response.data.count); // Update the count
       console.log(response.data.count);
     } catch (error) {
@@ -38,7 +66,9 @@ const HomeScreen = ({ navigation }) => {
   const handleStartToday = async () => {
     try {
       console.log('Username:', uid);
-      await axios.post('http://192.168.68.50:5000/start-today', { uid });
+      // const baseUrl = baseUrl ;
+      
+      await axios.post(`${baseUrl}/start-today`, { uid });
       fetchUsersTodayCount(); // Refresh count after pressing the button
       navigation.navigate('UserList');
     } catch (error) {

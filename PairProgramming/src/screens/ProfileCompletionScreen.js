@@ -1,3 +1,4 @@
+import {baseUrl} from "@env";
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Image,TouchableOpacity, Alert } from 'react-native';
 import auth from '@react-native-firebase/auth';
@@ -50,11 +51,13 @@ const ProfileCompletionScreen = () => {
       console.log(currentUser.email)
       console.log(preferredLanguage)
       console.log(preferredSolvingTime)
+      console.log(baseUrl)
 
-      const response = await axios.post('http://192.168.68.50:5000/create-profile', formData, {
+      // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
+      const response = await axios.post(`${baseUrl}/create-profile`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-
+      console.log(baseUrl)
       if (response.status === 200) {
         navigation.navigate('Home'); // Navigate to Home after profile creation
       }

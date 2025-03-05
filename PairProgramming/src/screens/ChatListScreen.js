@@ -1,4 +1,5 @@
 // ChatListScreen.js (React Native)
+import {baseUrl} from "@env";
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity,Image,Button, StyleSheet } from 'react-native';
 import axios from 'axios';
@@ -21,7 +22,8 @@ useEffect(() => {
     }
 
     try {
-      const response = await axios.get('http://192.168.68.50:5000/get-chat-users', {
+      // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
+      const response = await axios.get(`${baseUrl}/get-chat-users`, {
         params: { uid: currentUserUID }
       });
 

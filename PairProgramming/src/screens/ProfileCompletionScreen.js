@@ -1,6 +1,6 @@
-import {baseUrl} from "@env";
+import { baseUrl } from "@env";
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Image,TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
@@ -12,6 +12,7 @@ const ProfileCompletionScreen = () => {
   const [username, setUsername] = useState('');
   const [preferredSolvingTime, setPreferredSolvingTime] = useState('');
   const [profilePic, setProfilePic] = useState(null); // Store profile picture
+  const [leetcodeProfileId, setLeetcodeProfileId] = useState(''); // New state for Leetcode profile ID
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
   const currentUser = auth().currentUser;
@@ -25,8 +26,8 @@ const ProfileCompletionScreen = () => {
   };
 
   const handleProfileSubmit = async () => {
-    if (!username || !preferredLanguage || !preferredSolvingTime || !profilePic) {
-      Alert.alert('Error', 'Please fill out all fields and select a profile picture.');
+    if (!username || !preferredLanguage || !preferredSolvingTime || !profilePic || !leetcodeProfileId) {
+      Alert.alert('Error', 'Please fill out all fields, including Leetcode Profile ID and select a profile picture.');
       return;
     }
 
@@ -45,19 +46,21 @@ const ProfileCompletionScreen = () => {
       formData.append('email', currentUser.email);
       formData.append('preferredLanguage', preferredLanguage);
       formData.append('preferredSolvingTime', preferredSolvingTime);
-      console.log(currentUser.uid)
-      console.log(username)
-      //console.log(currentUser.displayName)
-      console.log(currentUser.email)
-      console.log(preferredLanguage)
-      console.log(preferredSolvingTime)
-      console.log(baseUrl)
+      formData.append('leetcodeProfileId', leetcodeProfileId); // Include Leetcode profile ID
+
+      console.log(currentUser.uid);
+      console.log(username);
+      console.log(currentUser.email);
+      console.log(preferredLanguage);
+      console.log(preferredSolvingTime);
+      console.log(leetcodeProfileId); // Log Leetcode profile ID
 
       // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
       const response = await axios.post(`${baseUrl}/create-profile`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      console.log(baseUrl)
+      console.log(baseUrl);
+
       if (response.status === 200) {
         navigation.navigate('Home'); // Navigate to Home after profile creation
       }
@@ -88,13 +91,21 @@ const ProfileCompletionScreen = () => {
         placeholderTextColor="#888"
       />
 
+      <TextInput
+        style={styles.input}
+        value={leetcodeProfileId}
+        onChangeText={setLeetcodeProfileId}  // Handle change for Leetcode profile ID
+        placeholder="Leetcode Profile ID"
+        placeholderTextColor="#888"
+      />
+
       <View style={styles.pickerContainer}>
         <Picker
           selectedValue={preferredLanguage}
           style={styles.picker}
           onValueChange={setPreferredLanguage}
         >
-         <Picker.Item label="Select Programming Language" value={null} />
+          <Picker.Item label="Select Programming Language" value={null} />
           <Picker.Item label="C" value="C" />
           <Picker.Item label="C++" value="C++" />
           <Picker.Item label="PYTHON" value="PYTHON" />
@@ -107,7 +118,7 @@ const ProfileCompletionScreen = () => {
           style={styles.picker}
           onValueChange={setPreferredSolvingTime}
         >
-         <Picker.Item label="Select Preferred Coding Time" value={null} />
+          <Picker.Item label="Select Preferred Coding Time" value={null} />
           <Picker.Item label="Morning" value="Morning" />
           <Picker.Item label="Afternoon" value="Afternoon" />
           <Picker.Item label="Evening" value="Evening" />
@@ -196,8 +207,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
-    // fontSize: 18,
-    // fontWeight: 'bold',
   },
 });
 

@@ -1,23 +1,37 @@
-import {baseUrl} from "@env";
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, TextInput, Button, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import axios from 'axios';
+import io from 'socket.io-client'; // Import socket.io-client
 import auth from '@react-native-firebase/auth';
-import { ChevronLeft,Send } from 'lucide-react-native';
+import { ChevronLeft, Send } from 'lucide-react-native';
+import { baseUrl } from '@env';
 
 const ChatScreen = ({ route, navigation }) => {
   const [messages, setMessages] = useState([]);
-  const [error, setError] = useState(null);
   const [messageText, setMessageText] = useState('');
   const [otherUserName, setOtherUserName] = useState('');
 
-
   const currentUserUID = auth().currentUser?.uid;
-  const { otherUserUID } = route.params;
-  const { userUID } = route.params;
-
+  const { otherUserUID, userUID } = route.params;
   const extractedOtherUserUID = otherUserUID?.uid || otherUserUID || userUID;
-  const chatContainerRef = useRef();  // Reference for auto-scrolling
+  const chatContainerRef = useRef();
+
+  // Establish WebSocket connection
+  useEffect(() => {
+    const socket = io(baseUrl); // Connect to the WebSocket server
+
+    socket.on('newMessage', (newMessage) => {
+      // When a new message is received via WebSocket
+      if (newMessage.senderUID === extractedOtherUserUID || newMessage.receiverUID === extractedOtherUserUID) {
+        setMessages((prevMessages) => [...prevMessages, newMessage]);
+      }
+    });
+
+    // Clean up the WebSocket connection when component unmounts
+    return () => {
+      socket.disconnect();
+    };
+  }, [extractedOtherUserUID]);
 
   useEffect(() => {
     const fetchOtherUserName = async () => {
@@ -26,9 +40,6 @@ const ChatScreen = ({ route, navigation }) => {
           params: { userUID: extractedOtherUserUID }
         });
         setOtherUserName(response.data.username);
-        console.log(response.data.username);
-        console.log(extractedOtherUserUID);
-        //console.log(data);// Assuming response contains a 'name' field
       } catch (err) {
         console.error('Error fetching user data:', err);
       }
@@ -37,11 +48,9 @@ const ChatScreen = ({ route, navigation }) => {
     fetchOtherUserName();
   }, [extractedOtherUserUID]);
 
-//console.log(otherUserName)
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
         const response = await axios.get(`${baseUrl}/api/messages/get-messages`, {
           params: { user1: currentUserUID, user2: extractedOtherUserUID },
         });
@@ -57,28 +66,27 @@ const ChatScreen = ({ route, navigation }) => {
         }
 
       } catch (err) {
-        setError('Error fetching messages');
+        console.error('Error fetching messages:', err);
       }
     };
 
     fetchMessages();
-  }, [currentUserUID, extractedOtherUserUID]); 
+  }, [currentUserUID, extractedOtherUserUID]);
 
-  // Handle sending a message
   const handleSendMessage = async () => {
-    if (messageText.trim() === '') return; // Prevent sending empty messages
-  
+    if (messageText.trim() === '') return;
+
     const tempMessage = {
-      _id: new Date().toISOString(), // Temporary ID to uniquely identify the message
+      _id: new Date().toISOString(),
       senderUID: currentUserUID,
       receiverUID: extractedOtherUserUID,
       message: messageText,
       timestamp: new Date().toISOString(),
-      isTemp: true, // Mark this as temporary
+      isTemp: true,
     };
 
     setMessages((prevMessages) => [...prevMessages, tempMessage]);
-    setMessageText(''); // Clear the input field
+    setMessageText('');
 
     try {
       const response = await axios.post(`${baseUrl}/api/messages/send-message`, {
@@ -88,13 +96,14 @@ const ChatScreen = ({ route, navigation }) => {
       });
 
       if (response.status === 201) {
-        const savedMessage = response.data.data;
+        // Emit via WebSocket for real-time updates
+        const socket = io(baseUrl);
+        socket.emit('sendMessage', response.data.savedMessage);
       } else {
         throw new Error('Failed to send message');
       }
     } catch (err) {
       console.error('Error sending message:', err);
-
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
           msg.isTemp && msg._id === tempMessage._id
@@ -102,16 +111,10 @@ const ChatScreen = ({ route, navigation }) => {
             : msg
         )
       );
-
-      setError('Failed to send message');
     }
   };
 
   const RenderMessageItem = React.memo(({ item }) => {
-    if (!item || !item.message || !item.senderUID || item.message === '') {
-      return null; // Skip rendering if the item is invalid
-    }
-
     return (
       <View
         style={[
@@ -135,8 +138,9 @@ const ChatScreen = ({ route, navigation }) => {
       </View>
 
       {/* Message list */}
-      <FlatList style={styles.renderingMessageBox}
-        ref={chatContainerRef} 
+      <FlatList
+        style={styles.renderingMessageBox}
+        ref={chatContainerRef}
         data={messages}
         keyExtractor={(item, index) => index.toString()}
         renderItem={({ item }) => <RenderMessageItem item={item} />}
@@ -154,12 +158,13 @@ const ChatScreen = ({ route, navigation }) => {
           placeholder="Type a message..."
         />
         <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
-          <Send  size={24} color="#949494" />
+          <Send size={24} color="#949494" />
         </TouchableOpacity>
       </View>
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {

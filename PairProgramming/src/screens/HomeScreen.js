@@ -1,78 +1,67 @@
-import {PORT} from "@env";
-import {baseUrl} from "@env";
-
-console.log('PORT:',PORT);
-console.log('BASEURL',baseUrl);
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import axios from 'axios';
-import auth from '@react-native-firebase/auth';
-import UserListScreen from './UserListScreen';
-import ChatListScreen from './ChatListScreen';
-import ProfileEditScreen from './ProfileEditScreen';
-import { House, MessageCircle, UserRoundPen } from 'lucide-react-native';
-console.log(PORT); // Output: http://example.com/api
-
-
-console.log('BASEURL',baseUrl);
-console.log('BASEURL',PORT);
-
-const fetchUsersTodayCount = async () => {
-  try {
-    // Use the imported BASE_URL variable
-    const response = await axios.get(`${BASE_URL}/count-start-today`);
-    setUsersTodayCount(response.data.count); // Update the count
-    console.log(response.data.count);
-  } catch (error) {
-    console.error('Error fetching users today count:', error);
-  }
-};
-
-
+import { PORT } from "@env";
+import { baseUrl } from "@env";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import axios from "axios";
+import auth from "@react-native-firebase/auth";
+import UserListScreen from "./UserListScreen";
+import ChatListScreen from "./ChatListScreen";
+import ProfileEditScreen from "./ProfileEditScreen";
+import { House, MessageCircle, UserRoundPen } from "lucide-react-native";
 
 const Tab = createBottomTabNavigator();
 
 const HomeScreen = ({ navigation }) => {
-  const [uid, setUid] = useState('Guest');
+  const [uid, setUid] = useState("Guest");
   const [usersTodayCount, setUsersTodayCount] = useState(0); // Added state for count
+  const [leetcodeProgress, setLeetcodeProgress] = useState(null); // State for LeetCode progress
+  const [loadingProgress, setLoadingProgress] = useState(true); // Loading state for LeetCode progress
 
   useEffect(() => {
     const user = auth().currentUser;
     if (user) {
-      setUid(user.uid || 'Guest');
+      setUid(user.uid || "Guest");
     }
 
     // Fetch the number of users who started today
     fetchUsersTodayCount();
+
+    // Fetch LeetCode progress
+    if (user) {
+      fetchLeetcodeProgress(user.uid);
+    }
   }, []);
 
   const fetchUsersTodayCount = async () => {
     try {
-      // const baseUrl = baseUrl ; // Default to localhost for developmentconst 
-      console.log('THIS BASEURL',baseUrl,"/count-start-today");
-
       const response = await axios.get(`${baseUrl}/count-start-today`);
-      console.log(baseUrl);
-      console.log(response.data.count);
       setUsersTodayCount(response.data.count); // Update the count
       console.log(response.data.count);
     } catch (error) {
-      console.error('Error fetching users today count:', error);
+      console.error("Error fetching users today count:", error);
     }
+  };
 
+  const fetchLeetcodeProgress = async (userId) => {
+    try {
+      setLoadingProgress(true); // Start loading
+      const response = await axios.get(`${baseUrl}/get-progress/${userId}`);
+      setLeetcodeProgress(response.data); // Set the fetched progress
+      setLoadingProgress(false); // Stop loading
+    } catch (error) {
+      console.error("Error fetching LeetCode progress:", error);
+      setLoadingProgress(false); // Stop loading on error
+    }
   };
 
   const handleStartToday = async () => {
     try {
-      console.log('Username:', uid);
-      // const baseUrl = baseUrl ;
-      
       await axios.post(`${baseUrl}/start-today`, { uid });
       fetchUsersTodayCount(); // Refresh count after pressing the button
-      navigation.navigate('UserList');
+      navigation.navigate("UserList");
     } catch (error) {
-      console.error('Error sending user data:', error);
+      console.error("Error sending user data:", error);
     }
   };
 
@@ -89,22 +78,36 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.container}>
             <Text style={styles.heading}>Welcome to Code Buddy</Text>
             <Text style={styles.text}>Ready to solve problems with your coding partner?</Text>
-            
-            <TouchableOpacity
-              style={styles.startTodayButton}
-              onPress={handleStartToday}
-            >
+
+            <TouchableOpacity style={styles.startTodayButton} onPress={handleStartToday}>
               <Text style={styles.startTodayText}>Start Today</Text>
             </TouchableOpacity>
 
-            {/* Show number of users who started today */}
+            {/* Show the number of users who started today */}
             <Text style={styles.usersTodayText}>
               {usersTodayCount} user(s) have started today
             </Text>
+
+            {/* Show LeetCode Progress */}
+            <View style={styles.progressContainer}>
+              {loadingProgress ? (
+                <Text style={styles.progressText}>Loading progress...</Text>
+              ) : leetcodeProgress ? (
+                <>
+                  <Text style={styles.progressText}>
+                    LeetCode Progress: {leetcodeProgress.solvedQuestions} questions solved
+                  </Text>
+                  <Text style={styles.progressText}>
+                    {leetcodeProgress.striverDSAProgress.solvedCount} out of {leetcodeProgress.striverDSAProgress.totalCount} problems solved from Striver's DSA. Percentage: {leetcodeProgress.striverDSAProgress.progressPercentage}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.progressText}>No progress available</Text>
+              )}
+            </View>
           </View>
         )}
         options={{
-          // headerShown: false,
           tabBarIcon: ({ color, size }) => <House size={20} color="#000" />,
         }}
       />
@@ -131,52 +134,49 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    // backgroundColor: 'white',
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
   },
   heading: {
-    fontSize: 27,
-    fontWeight: 'bold',
-    color: 'black',
-    textAlign: 'center',
-    marginBottom: 10,
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 16,
   },
   text: {
-    fontSize: 18,
-    // fontWeight: 'bold',
-    color: 'black',
-    textAlign: 'center',
+    fontSize: 16,
     marginBottom: 20,
+    textAlign: "center",
   },
   startTodayButton: {
-    backgroundColor: 'black',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    width: '100%',
+    backgroundColor: "#007bff",
+    padding: 12,
+    borderRadius: 5,
+    marginBottom: 20,
   },
   startTodayText: {
-    color: 'white',
+    color: "#fff",
     fontSize: 18,
   },
   usersTodayText: {
-    marginTop: 10, // Space between button and text
     fontSize: 16,
-    color: 'gray',
-    // fontWeight: 'bold',
-    textAlign: 'center',
+    color: "#555",
+    marginTop: 10,
+  },
+  progressContainer: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: "#f1f1f1",
+    borderRadius: 5,
+    width: "100%",
+    alignItems: "center",
+  },
+  progressText: {
+    fontSize: 16,
+    color: "#333",
   },
   tabBar: {
-    backgroundColor: 'white',
-    paddingTop:'5',
-    // marginBottom: 15,
-    // marginHorizontal: 15,
-    // borderRadius: 20,
-    // elevation: 5,
-    // borderWidth: 2, // Border thickness
-    // borderColor: 'gray', // Border color
+    backgroundColor: "#fff",
   },
 });
 

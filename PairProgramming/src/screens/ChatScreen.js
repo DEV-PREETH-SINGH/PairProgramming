@@ -73,9 +73,78 @@ const ChatScreen = ({ route, navigation }) => {
     fetchMessages();
   }, [currentUserUID, extractedOtherUserUID]);
 
+  // const handleSendMessage = async () => {
+  //   if (messageText.trim() === '') return;
+
+  //   const tempMessage = {
+  //     _id: new Date().toISOString(),
+  //     senderUID: currentUserUID,
+  //     receiverUID: extractedOtherUserUID,
+  //     message: messageText,
+  //     timestamp: new Date().toISOString(),
+  //     isTemp: true,
+  //   };
+
+  //   setMessages((prevMessages) => [...prevMessages, tempMessage]);
+  //   setMessageText('');
+
+  //   try {
+  //     const response = await axios.post(`${baseUrl}/api/messages/send-message`, {
+  //       senderUID: currentUserUID,
+  //       receiverUID: extractedOtherUserUID,
+  //       message: messageText,
+  //     });
+
+  //     if (response.status === 201) {
+  //       // Emit via WebSocket for real-time updates
+  //       const socket = io(baseUrl);
+  //       socket.emit('sendMessage', response.data.savedMessage);
+  //     } else {
+  //       throw new Error('Failed to send message');
+  //     }
+  //   } catch (err) {
+  //     console.error('Error sending message:', err);
+  //     setMessages((prevMessages) =>
+  //       prevMessages.map((msg) =>
+  //         msg.isTemp && msg._id === tempMessage._id
+  //           ? { ...msg, error: 'Failed to send' }
+  //           : msg
+  //       )
+  //     );
+  //   }
+  // };
+
   const handleSendMessage = async () => {
     if (messageText.trim() === '') return;
-
+  
+    // Check if the message is a special command
+    if (messageText.trim() === './send' || messageText.trim() === './accepted') {
+      try {
+        console.log("send")
+        const apiUrl = messageText.trim() === './send' 
+          ? `${baseUrl}/api/messages/send-special`
+          : `${baseUrl}/api/messages/accepted`;
+  
+        const response = await axios.post(apiUrl, {
+          senderUID: currentUserUID,
+          receiverUID: extractedOtherUserUID,
+        });
+  
+        if (response.status === 201) {
+          // Handle the successful response if necessary
+          console.log('API call successful:', response.data);
+        } else {
+          throw new Error('API call failed');
+        }
+      } catch (err) {
+        console.error('Error making API call:', err);
+      }
+      // Don't send the message as a chat message
+      setMessageText('');
+      return;
+    }
+  
+    // For normal messages, proceed with sending the message
     const tempMessage = {
       _id: new Date().toISOString(),
       senderUID: currentUserUID,
@@ -84,17 +153,17 @@ const ChatScreen = ({ route, navigation }) => {
       timestamp: new Date().toISOString(),
       isTemp: true,
     };
-
+  
     setMessages((prevMessages) => [...prevMessages, tempMessage]);
     setMessageText('');
-
+  
     try {
       const response = await axios.post(`${baseUrl}/api/messages/send-message`, {
         senderUID: currentUserUID,
         receiverUID: extractedOtherUserUID,
         message: messageText,
       });
-
+  
       if (response.status === 201) {
         // Emit via WebSocket for real-time updates
         const socket = io(baseUrl);
@@ -113,6 +182,7 @@ const ChatScreen = ({ route, navigation }) => {
       );
     }
   };
+  
 
   const RenderMessageItem = React.memo(({ item }) => {
     return (

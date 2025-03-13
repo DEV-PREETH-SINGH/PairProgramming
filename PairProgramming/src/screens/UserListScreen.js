@@ -1,11 +1,10 @@
 import {baseUrl} from "@env";
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Button, StyleSheet, Image ,TouchableOpacity} from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import axios from 'axios';
 import auth from '@react-native-firebase/auth';
-
-
-import { ChevronLeft,MessageCircle } from 'lucide-react-native';
+import Swiper from 'react-native-deck-swiper';
+import { ChevronLeft, MessageCircle } from 'lucide-react-native';
 
 const UserListScreen = ({ navigation }) => {
   const [users, setUsers] = useState([]);
@@ -19,15 +18,12 @@ const UserListScreen = ({ navigation }) => {
           throw new Error('No user is currently logged in');
         }
 
-        console.log(currentUserUID)
-        // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
         const response = await axios.get(`${baseUrl}/get-users?uid=${currentUserUID}`);
         setUsers(response.data.users);
       } catch (err) {
         setError('Error fetching user list');
         console.error(err);
       }
-      
     };
 
     fetchUserList();
@@ -45,45 +41,45 @@ const UserListScreen = ({ navigation }) => {
     navigation.navigate('Chat', { otherUserUID });
   };
 
+  const handleSwipedRight = (index) => {
+    const user = users[index];
+    handleChatPress(user.uid); // Navigate to chat screen
+  };
+
+  const handleSwipedLeft = () => {
+    // Logic to handle swiping left (skip user)
+  };
+
   return (
     <View style={styles.container}>
-      {/* Top Bar with Back Button */}
       <View style={styles.topBar}>
-        <ChevronLeft 
-          
-          size={30}
-          color="#aaa"
-          onPress={() => navigation.goBack()} // Navigate to the previous screen
-        />
+        <ChevronLeft size={30} color="#aaa" onPress={() => navigation.goBack()} />
         <Text style={styles.heading}>CodeBuddies for Today</Text>
       </View>
 
       {users.length > 0 ? (
-        <FlatList
-          data={users}
-          keyExtractor={(item) => item.uid.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.userItem}>
+        <Swiper
+          cards={users}
+          renderCard={(user) => (
+            <View style={styles.userCard}>
               <Image
-                source={{ uri: item.profilePic || 'https://i.pinimg.com/736x/44/84/b6/4484b675ec3d56549907807fccf75b81.jpg' }}
+                source={{ uri: user.profilePic || 'https://i.pinimg.com/736x/44/84/b6/4484b675ec3d56549907807fccf75b81.jpg' }}
                 style={styles.profilePic}
               />
-              <Text style={styles.userText}>{item.username}</Text>
-              <TouchableOpacity 
-                style={styles.chatButton}
-                onPress={() => handleChatPress(item.uid)}
-              >
-                <MessageCircle size={20} color="#000" />
-              </TouchableOpacity>
+              <View style={styles.nameContainer}>
+                <Text style={styles.userName}>{user.username}</Text>
+              </View>
             </View>
           )}
+          onSwipedRight={handleSwipedRight}
+          onSwipedLeft={handleSwipedLeft}
+          cardIndex={0}
+          backgroundColor={'transparent'}
+          stackSize={3}
         />
       ) : (
         <View style={styles.noUsersContainer}>
-        <Image
-            source={require('../assets/No_user.jpg')} // Replace with your image URL
-            style={styles.emptyImage}
-          />
+          <Image source={require('../assets/No_user.jpg')} style={styles.emptyImage} />
           <Text style={styles.noUsersText}>Looks like the place is empty, </Text>
           <Text style={styles.noUsersText}>check back soon.</Text>
         </View>
@@ -94,7 +90,7 @@ const UserListScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor:'white',
+    backgroundColor: 'white',
     flex: 1,
     padding: 20,
   },
@@ -107,32 +103,36 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginLeft: 10,
-    paddingRight:50,
+    paddingRight: 50,
     flex: 1,
     textAlign: 'center',
   },
-  text: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  userItem: {
-    flexDirection: 'row',
+  userCard: {
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    height: '90%', // Take up most of the screen
+    borderRadius: 10,
   },
   profilePic: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 10,
+    width: '100%', // Full width of the screen
+    height: '100%', // Full height of the screen
+    borderRadius: 10,
   },
-  userText: {
-    fontSize: 18,
-    flex: 1,
+  nameContainer: {
+    position: 'absolute',
+    bottom: 20, // Position the name at the bottom of the card
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Transparent background
+    paddingVertical: 5,
+    paddingHorizontal: 15,
+    borderRadius: 25,
+  },
+  userName: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   noUsersContainer: {
     flex: 1,

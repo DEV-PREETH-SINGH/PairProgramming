@@ -5,16 +5,18 @@ console.log("Type of PORT:", typeof PORT);
 console.log("PORT:", JSON.stringify(PORT, null, 2));
 
 
-
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native'; // Only this container
 import AppNavigator from './navigation/AppNavigator';
+import { UserProvider } from './context/UserContext';
 
 const App = () => {
   return (
-    <NavigationContainer>
-      <AppNavigator />
-    </NavigationContainer>
+    <UserProvider>
+      <NavigationContainer> {/* Keep only one here */}
+        <AppNavigator />
+      </NavigationContainer>
+    </UserProvider>
   );
 };
 

@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const multer = require('multer');
+const axios = require('axios');
+
 const bodyParser = require('body-parser');
 require('dotenv').config();
 const router = express.Router();
@@ -21,8 +23,9 @@ const User = require('./models/User');
 // Import Message model
 const Message = require('./models/message'); // Assuming you have created this in the models folder
 
-const baseUrl = process.env.BASE_URL || 5000; // Default to localhost for development
-
+const baseUrl = 'http://192.168.68.73:5000'; // Default to localhost for development
+console.log(baseUrl);
+const Problem = require("./models/striver79DsaSheetProblems");
 
 
 app.use('/uploads', express.static('uploads')); // Serve images from 'uploads' folder
@@ -78,6 +81,32 @@ app.post('/signup', async (req, res) => {
     res.status(500).send({ message: 'Error registering user', error: err.message });
   }
 });
+
+// API Endpoint to fetch user by UID
+app.get('/users/:uid', async (req, res) => {
+  try {
+    const { uid } = req.params;
+
+    console.log("from backend ",uid);
+    // Find user by UID
+    const user = await User.findOne({ uid });
+
+    console.log("from backend ",user);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Return the username and profilePic
+    res.json({
+      username: user.username,
+      profilePic: user.profilePic,
+    });
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 
 // "Start Today" Endpoint: Update user status
 app.post('/start-today', async (req, res) => {
@@ -199,12 +228,11 @@ app.get('/api/users/get-username', async (req, res) => {
 // Messaging Endpoints
 // =====================
 
-// Endpoint to get messages between two users
 app.get('/api/messages/get-messages', async (req, res) => {
   const { user1, user2 } = req.query;
 
   if (!user1 || !user2) {
-    return res.status(400).send({ message: 'Missing user1 or user2 in request' });
+    return res.status(400).json({ message: 'Missing user1 or user2 in request' });
   }
 
   try {
@@ -218,14 +246,14 @@ app.get('/api/messages/get-messages', async (req, res) => {
     res.status(200).json({ messages });
   } catch (err) {
     console.error('Error fetching messages:', err);
-    res.status(500).send({ message: 'Error fetching messages', error: err.message });
+    res.status(500).json({ message: 'Error fetching messages', error: err.message });
   }
 });
+
 // WebSocket connection event
 io.on('connection', (socket) => {
-  console.log('A user connected');
+  console.log('A user connected', socket.id);
 
-  // Handle receiving message
   socket.on('sendMessage', async (messageData) => {
     console.log('Message received:', messageData);
 
@@ -241,10 +269,9 @@ io.on('connection', (socket) => {
 
       const savedMessage = await newMessage.save();
 
-      // Emit the new message to the receiver
-      io.emit('newMessage', savedMessage);
-
-      socket.emit('messageSent', savedMessage); // Emit back to sender for confirmation
+      // Emit only to sender and receiver instead of broadcasting
+      socket.to(receiverUID).emit('newMessage', savedMessage);
+      socket.emit('messageSent', savedMessage);
     } catch (err) {
       console.error('Error handling sendMessage:', err);
       socket.emit('error', { message: 'Error sending message', error: err.message });
@@ -252,17 +279,16 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('User disconnected');
+    console.log('User disconnected', socket.id);
   });
 });
 
-// Your existing express server and message endpoint...
 // Endpoint to send a new message
 app.post('/api/messages/send-message', async (req, res) => {
   const { senderUID, receiverUID, message } = req.body;
 
   if (!senderUID || !receiverUID || !message) {
-    return res.status(400).send({ message: 'Missing required fields: senderUID, receiverUID, or message' });
+    return res.status(400).json({ message: 'Missing required fields: senderUID, receiverUID, or message' });
   }
 
   try {
@@ -274,21 +300,76 @@ app.post('/api/messages/send-message', async (req, res) => {
     });
 
     const savedMessage = await newMessage.save();
-    res.status(201).send({
-      message: 'Message sent successfully',
-      savedMessage,
-    });
+    res.status(201).json({ message: 'Message sent successfully', savedMessage });
 
-    // Emit the message via WebSocket
-    io.emit('newMessage', savedMessage);
+    // Emit the message to both sender and receiver
+    io.to(receiverUID).emit('newMessage', savedMessage);
+    io.to(senderUID).emit('messageSent', savedMessage);
   } catch (err) {
     console.error('Error sending message:', err);
-    res.status(500).send({
-      message: 'Error sending message',
-      error: err.message,
-    });
+    res.status(500).json({ message: 'Error sending message', error: err.message });
   }
 });
+
+// Route 1: /send-special - Push currentUserUID to the other user's pendingRequest
+app.post('/api/messages/send-special', async (req, res) => {
+  const { senderUID, receiverUID } = req.body;
+
+  try {
+    // Find the receiver and add the sender's UID to the pendingRequest array
+    const receiver = await User.findOne({ uid: receiverUID });
+
+    if (!receiver) {
+      return res.status(404).json({ error: 'Receiver not found' });
+    }
+
+    // Add sender's UID to receiver's pendingRequest
+    receiver.pendingRequest.push(senderUID);
+    await receiver.save();
+
+    res.status(201).json({ message: 'Request sent successfully' });
+  } catch (error) {
+    console.error('Error sending special request:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/messages/accepted', async (req, res) => {
+  const { senderUID, receiverUID } = req.body;
+
+  try {
+    // Find the current user (sender) and the receiver
+    const sender = await User.findOne({ uid: senderUID });
+    const receiver = await User.findOne({ uid: receiverUID });
+
+    if (!sender || !receiver) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if the receiver's UID is in the sender's pendingRequest
+    if (!sender.pendingRequest.includes(receiverUID)) {
+      return res.status(400).json({ error: 'No pending request from the receiver' });
+    }
+
+    // Update the partner field for both users
+    sender.partner = receiverUID;
+    receiver.partner = senderUID;
+
+    // Remove receiverUID from sender's pendingRequest
+    sender.pendingRequest.pull(receiverUID);
+
+    // Save the updated users
+    await sender.save();
+    await receiver.save();
+
+    res.status(201).json({ message: 'Partner request accepted successfully and pending request removed' });
+  } catch (error) {
+    console.error('Error accepting partner request:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+//-------------chatscreen end
 
 // Route to get distinct chat users
 app.get('/get-chat-users', async (req, res) => {
@@ -352,12 +433,609 @@ app.get('/get-chat-users', async (req, res) => {
     res.status(500).send('Server error');
   }
 });
+//-----------------get chat user end
+app.get('/get-partner', async (req, res) => {
+  const currentUID = req.query.uid; // Get the current user's UID from the query parameter
+
+  if (!currentUID) {
+    return res.status(400).json({ message: 'Current UID is required' });
+  }
+
+  try {
+    // Find the user by their UID in the database
+    const user = await User.findOne({ uid: currentUID });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if the user has a partner
+    if (user.partner) {
+      console.log("my partner uid:", user.partner)
+      return res.json({ partnerUID: user.partner }); // Return the partner UID
+    } else {
+      return res.json({ partnerUID: null }); // If no partner exists
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+// API to check submissions and update streaks
+app.post('/api/messages/check-streak', async (req, res) => {
+  const { userAUID } = req.body;
+
+  try {
+    // Fetch user data from the database
+    const userA = await User.findOne({ uid: userAUID });
+
+    if (!userA) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Step 1: Verify if the current user has a partner (check if partner field is not null)
+    if (!userA.partner) {
+      return res.status(400).json({ error: 'No partner assigned to the user' });
+    }
+
+    // Get the partner details
+    const userB = await User.findOne({ uid: userA.partner });
+
+    if (!userB) {
+      return res.status(404).json({ error: 'Partner user not found' });
+    }
+
+    // Step 2: Fetch submissions for both users
+    const fetchSubmissions = async (leetcodeProfileId) => {
+      try {
+        const response = await axios.get(`https://leetcode-api-faisalshohag.vercel.app/${leetcodeProfileId}`);
+        return response.data.recentSubmissions || []; // Assuming recent submissions is the key
+      } catch (err) {
+        console.error('Error fetching submissions:', err);
+        return [];
+      }
+    };
+
+    // Fetch submissions for both users
+    const submissionsA = await fetchSubmissions(userA.leetcodeProfileId);
+    const submissionsB = await fetchSubmissions(userB.leetcodeProfileId);
+
+    // Step 3: Check the submissions for accepted solutions on the same day
+    const isSameDay = (timestamp) => moment.unix(timestamp).isSame(moment(), 'day');
+
+    const acceptedA = submissionsA.find(submission =>
+      isSameDay(submission.timestamp) && submission.statusDisplay === 'Accepted'
+    );
+
+    const acceptedB = submissionsB.find(submission =>
+      isSameDay(submission.timestamp) && submission.statusDisplay === 'Accepted'
+    );
+
+    // Step 4: Update streak count if both users solved a problem today
+    if (acceptedA && acceptedB) {
+      // Both users have accepted submissions today, increase streak count
+      userA.streakCount = (userA.streakCount || 0) + 1;
+      userB.streakCount = (userB.streakCount || 0) + 1;
+
+      await userA.save();
+      await userB.save();
+      
+      return res.status(200).json({ message: 'Streak updated for both users',streakCount:userA.streakCount });
+    } else {
+      // If one or both users did not submit an accepted solution today, reset streak count
+      userA.streakCount = 0;
+      userB.streakCount = 0;
+
+      await userA.save();
+      await userB.save();
+
+      return res.status(200).json({ message: 'Streak reset for both users',streakCount:userA.streakCount });
+    }
+  } catch (error) {
+    console.error('Error checking streak:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+//------------streakcountend
+
+// app.get('/get-progress/:userId', async (req, res) => {
+//   const userId = req.params.userId;
+
+//   try {
+//     // Find the user by their userId
+//     const user = await User.findOne({ uid: userId });
+
+//     if (!user) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
+
+//     if (!user.leetcodeProfileId) {
+//       return res.status(400).json({ message: 'LeetCode username not linked' });
+//     }
+
+//     // Fetch user stats from LeetCode API
+//     const response = await axios.get(`https://leetcode-api-faisalshohag.vercel.app/${user.leetcodeProfileId}`);
+
+//     if (response.data.status !== 'success') {
+//       return res.status(500).json({ message: 'Failed to fetch LeetCode stats' });
+//     }
+
+//     const { totalSolved } = response.data;
+
+//     // Update the user's solved questions count
+//     user.solvedQuestions = totalSolved;
+//     user.leetcodeLastUpdated = new Date();
+//     await user.save();
+
+//     // Send the updated progress back to the frontend
+//     res.json({
+//       solvedQuestions: totalSolved,
+//       leetcodeLastUpdated: user.leetcodeLastUpdated,
+//     });
+//   } catch (error) {
+//     console.error('Error fetching LeetCode progress:', error.message);
+//     res.status(500).json({ message: 'Server error' });
+//   }
+// });
+
+//this is old which was working tile 2/80 problems solved.percentage:2
+// const striverDSAProblems = [
+//   { id: 1, title: 'Next-Permutation', solved: false },
+//   { id: 2, title: '3Sum', solved: false },
+//   { id: 3, title: 'Maximum Subarray', solved: false },
+//   { id: 4, title: 'Majority Element II', solved: false },
+//   { id: 5, title: 'Subarrays with K Different Integers', solved: false },
+//   { id: 6, title: 'Find the Duplicate Number', solved: false },
+//   { id: 7, title: 'Maximum Product Subarray', solved: false },
+//   { id: 8, title: 'Find the Missing Number', solved: false },
+//   { id: 9, title: 'Search in Rotated Sorted Array II', solved: false },
+//   { id: 10, title: 'Find Minimum in Rotated Sorted Array', solved: false },
+//   { id: 11, title: 'Find Peak Element', solved: false },
+//   { id: 12, title: 'Koko Eating Bananas', solved: false },
+//   { id: 13, title: 'Aggressive Cows', solved: false },
+//   { id: 14, title: 'Book Allocation', solved: false },
+//   { id: 15, title: 'Median of Two Sorted Arrays', solved: false },
+//   { id: 16, title: 'Minimize Max Distance to Gas Station', solved: false },
+//   { id: 17, title: 'Middle of the Linked List', solved: false },
+//   { id: 18, title: 'Detect a Loop in LL', solved: false },
+//   { id: 19, title: 'Remove Nth Node From End of List', solved: false },
+//   { id: 20, title: 'Intersection of Two Linked Lists', solved: false },
+//   { id: 21, title: 'Sort List', solved: false },
+//   { id: 22, title: 'Odd Even Linked List', solved: false },
+//   { id: 23, title: 'Subsets', solved: false },
+//   { id: 24, title: 'Combination Sum', solved: false },
+//   { id: 25, title: 'N-Queens', solved: false },
+//   { id: 26, title: 'Sudoku Solver', solved: false },
+//   { id: 27, title: 'M Coloring Problem', solved: false },
+//   { id: 28, title: 'Word Search', solved: false },
+//   { id: 29, title: 'Next Greater Element I', solved: false },
+//   { id: 30, title: 'Trapping Rain Water', solved: false },
+//   { id: 31, title: 'Largest Rectangle in Histogram', solved: false },
+//   { id: 32, title: 'Asteroid Collision', solved: false },
+//   { id: 33, title: 'Sliding Window Maximum', solved: false },
+//   { id: 34, title: 'LRU Cache', solved: false },
+//   { id: 35, title: 'Kth Largest Element in an Array', solved: false },
+//   { id: 36, title: 'Task Scheduler', solved: false },
+//   { id: 37, title: 'Min Heap', solved: false },
+//   { id: 38, title: 'Max Heap', solved: false },
+//   { id: 39, title: 'Diameter of Binary Tree', solved: false },
+//   { id: 40, title: 'Binary Tree Maximum Path Sum', solved: false },
+//   { id: 41, title: 'Binary Tree Bottom View', solved: false },
+//   { id: 42, title: 'Lowest Common Ancestor of a Binary Tree', solved: false },
+//   { id: 43, title: 'Minimum Time to Burn the Binary Tree', solved: false },
+//   { id: 44, title: 'Construct Binary Tree from Preorder and Inorder Traversal', solved: false },
+//   { id: 45, title: 'Binary Tree Preorder Traversal', solved: false },
+//   { id: 46, title: 'Delete Node in a BST', solved: false },
+//   { id: 47, title: 'Lowest Common Ancestor of a Binary Search Tree', solved: false },
+//   { id: 48, title: 'Two Sum IV - Input is a BST', solved: false },
+//   { id: 49, title: 'Largest BST Subtree', solved: false },
+//   { id: 50, title: 'Rotting Oranges', solved: false },
+//   { id: 51, title: 'Word Ladder', solved: false },
+//   { id: 52, title: 'Number of Distinct Islands', solved: false },
+//   { id: 53, title: 'Course Schedule II', solved: false },
+//   { id: 54, title: 'Alien Dictionary', solved: false },
+//   { id: 55, title: 'Dijkstra\'s Algorithm', solved: false },
+//   { id: 56, title: 'Cheapest Flights Within K Stops', solved: false },
+//   { id: 57, title: 'Bellman-Ford Algorithm', solved: false },
+//   { id: 58, title: 'Floyd-Warshall Algorithm', solved: false },
+//   { id: 59, title: 'Kruskal\'s Algorithm', solved: false },
+//   { id: 60, title: 'Accounts Merge', solved: false },
+//   { id: 61, title: 'Bridges in Graph', solved: false },
+//   { id: 62, title: 'House Robber', solved: false },
+//   { id: 63, title: 'Fibonacci Number', solved: false },
+//   { id: 64, title: 'Minimum Path Sum', solved: false },
+//   { id: 65, title: 'Subset Sum Problem', solved: false },
+//   { id: 66, title: 'Assign Cookies', solved: false },
+//   { id: 67, title: 'Rod Cutting', solved: false },
+//   { id: 68, title: 'Longest Common Subsequence', solved: false },
+//   { id: 69, title: 'Longest Palindromic Subsequence', solved: false },
+//   { id: 70, title: 'Edit Distance', solved: false },
+//   { id: 71, title: 'Best Time to Buy and Sell Stock IV', solved: false },
+//   { id: 72, title: 'Longest Increasing Subsequence', solved: false },
+//   { id: 73, title: 'Burst Balloons', solved: false },
+//   { id: 74, title: 'Implement Trie (Prefix Tree)', solved: false },
+//   { id: 75, title: 'Maximum XOR of Two Numbers in an Array', solved: false },
+//   { id: 76, title: 'Distinct Subsequences', solved: false },
+//   { id: 77, title: 'Minimum Number of Bracket Reversals', solved: false },
+//   { id: 78, title: 'Rabin Karp Algorithm', solved: false },
+//   { id: 79, title: 'Z-Algorithm', solved: false },
+//   { id: 80, title: 'KMP Algorithm', solved: false }
+// ];
+
+//new for difficulty
+
+// const striverDSAProblems = [
+//   { id: 1, title: 'Next-Permutation', solved: false, difficulty: 'Medium' },
+//   { id: 2, title: '3Sum', solved: false, difficulty: 'Medium' },
+//   { id: 3, title: 'Maximum Subarray', solved: false, difficulty: 'Medium' },
+//   { id: 4, title: 'Majority Element II', solved: false, difficulty: 'Medium' },
+//   { id: 5, title: 'Subarrays with K Different Integers', solved: false, difficulty: 'Hard' },
+//   { id: 6, title: 'Find the Duplicate Number', solved: false, difficulty: 'Medium' },
+//   { id: 7, title: 'Maximum Product Subarray', solved: false, difficulty: 'Medium' },
+//   { id: 8, title: 'Find the Missing Number', solved: false, difficulty: 'Easy' },
+//   { id: 9, title: 'Search in Rotated Sorted Array II', solved: false, difficulty: 'Medium' },
+//   { id: 10, title: 'Find Minimum in Rotated Sorted Array', solved: false, difficulty: 'Medium' },
+//   { id: 11, title: 'Find Peak Element', solved: false, difficulty: 'Medium' },
+//   { id: 12, title: 'Koko Eating Bananas', solved: false, difficulty: 'Medium' },
+//   { id: 13, title: 'Aggressive Cows', solved: false, difficulty: 'Not Available on LeetCode' },
+//   { id: 14, title: 'Book Allocation', solved: false, difficulty: 'Not Available on LeetCode' },
+//   { id: 15, title: 'Median of Two Sorted Arrays', solved: false, difficulty: 'Hard' },
+//   { id: 16, title: 'Minimize Max Distance to Gas Station', solved: false, difficulty: 'Hard' },
+//   { id: 17, title: 'Middle of the Linked List', solved: false, difficulty: 'Easy' },
+//   { id: 18, title: 'Detect a Loop in LL', solved: false, difficulty: 'Not Available on LeetCode' },
+//   { id: 19, title: 'Remove Nth Node From End of List', solved: false, difficulty: 'Medium' },
+//   { id: 20, title: 'Intersection of Two Linked Lists', solved: false, difficulty: 'Easy' },
+//   { id: 21, title: 'Sort List', solved: false, difficulty: 'Medium' },
+//   { id: 22, title: 'Odd Even Linked List', solved: false, difficulty: 'Medium' },
+//   { id: 23, title: 'Subsets', solved: false, difficulty: 'Medium' },
+//   { id: 24, title: 'Combination Sum', solved: false, difficulty: 'Medium' },
+//   { id: 25, title: 'N-Queens', solved: false, difficulty: 'Hard' },
+//   { id: 26, title: 'Sudoku Solver', solved: false, difficulty: 'Hard' },
+//   { id: 27, title: 'M Coloring Problem', solved: false, difficulty: 'Not Available on LeetCode' },
+//   { id: 28, title: 'Word Search', solved: false, difficulty: 'Medium' },
+//   { id: 29, title: 'Next Greater Element I', solved: false, difficulty: 'Easy' },
+//   { id: 30, title: 'Trapping Rain Water', solved: false, difficulty: 'Hard' },
+//   { id: 31, title: 'Largest Rectangle in Histogram', solved: false, difficulty: 'Hard' },
+//   { id: 32, title: 'Asteroid Collision', solved: false, difficulty: 'Medium' },
+//   { id: 33, title: 'Sliding Window Maximum', solved: false, difficulty: 'Hard' },
+//   { id: 34, title: 'LRU Cache', solved: false, difficulty: 'Medium' },
+//   { id: 35, title: 'Kth Largest Element in an Array', solved: false, difficulty: 'Medium' },
+//   { id: 36, title: 'Task Scheduler', solved: false, difficulty: 'Medium' },
+//   { id: 37, title: 'Min Heap', solved: false, difficulty: 'Not Available on LeetCode' },
+//   { id: 38, title: 'Max Heap', solved: false, difficulty: 'Not Available on LeetCode' },
+//   { id: 39, title: 'Diameter of Binary Tree', solved: false, difficulty: 'Easy' },
+//   { id: 40, title: 'Binary Tree Maximum Path Sum', solved: false, difficulty: 'Hard' },
+//   { id: 41, title: 'Binary Tree Bottom View', solved: false, difficulty: 'Not Available on LeetCode' },
+//   { id: 42, title: 'Lowest Common Ancestor of a Binary Tree', solved: false, difficulty: 'Medium' },
+//   { id: 43, title: 'Minimum Time to Burn the Binary Tree', solved: false, difficulty: 'Not Available on LeetCode' },
+//   { id: 44, title: 'Construct Binary Tree from Preorder and Inorder Traversal', solved: false, difficulty: 'Medium' },
+//   { id: 45, title: 'Binary Tree Preorder Traversal', solved: false, difficulty: 'Easy' },
+//   { id: 46, title: 'Delete Node in a BST', solved: false, difficulty: 'Medium' },
+//   { id: 47, title: 'Lowest Common Ancestor of a Binary Search Tree', solved: false, difficulty: 'Medium' },
+//   { id: 48, title: 'Two Sum IV - Input is a BST', solved: false, difficulty: 'Easy' },
+//   { id: 49, title: 'Largest BST Subtree', solved: false, difficulty: 'Medium' },
+//   { id: 50, title: 'Rotting Oranges', solved: false, difficulty: 'Medium' },
+//   { id: 75, title: 'Maximum XOR of Two Numbers in an Array', solved: false, difficulty: 'Medium' },
+//   { id: 76, title: 'Distinct Subsequences', solved: false, difficulty: 'Hard' },
+//   { id: 77, title: 'Minimum Number of Bracket Reversals', solved: false, difficulty: 'Not Available on LeetCode' },
+//   { id: 78, title: 'Rabin Karp Algorithm', solved: false, difficulty: 'Not Available on LeetCode' },
+//   { id: 79, title: 'Z-Algorithm', solved: false, difficulty: 'Not Available on LeetCode' },
+//   { id: 80, title: 'KMP Algorithm', solved: false, difficulty: 'Not Available on LeetCode' },
+// ];
+
+
+// app.get('/get-progress/:userId', async (req, res) => {
+//   const userId = req.params.userId;
+
+//   try {
+//     // Find the user by their userId
+//     const user = await User.findOne({ uid: userId });
+
+//     if (!user) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
+
+//     if (!user.leetcodeProfileId) {
+//       return res.status(400).json({ message: 'LeetCode username not linked' });
+//     }
+
+//     // Fetch user stats from the new LeetCode API
+//     const response = await axios.get(`https://leetcode-api-faisalshohag.vercel.app/${user.leetcodeProfileId}`);
+
+//     if (!response.data || !response.data.recentSubmissions) {
+//       return res.status(500).json({ message: 'Failed to fetch LeetCode stats' });
+//     }
+
+//     const { totalSolved, recentSubmissions } = response.data;  // Extracting total solved problems and recent submissions
+
+//     // Track how many problems from Striver's DSA Sheet the user has solved
+//     let solvedCount = 0;
+
+//     // Iterate over Striver's DSA problems
+//     striverDSAProblems.forEach(problem => {
+//       // Check if the problem is in the user's recent submissions and is marked as "Accepted"
+//       recentSubmissions.forEach(submission => {
+//         if (submission.titleSlug === problem.title.toLowerCase().replace(/ /g, '-')
+//             && submission.statusDisplay === 'Accepted') {
+//           problem.solved = true;
+//           solvedCount++;
+//         }
+//       });
+//     });
+
+//     // Calculate the progress as a percentage
+//     const progress = (solvedCount / striverDSAProblems.length) * 100;
+
+//     // Update the user's solved questions count
+//     user.solvedQuestions = totalSolved;
+//     user.leetcodeLastUpdated = new Date();
+//     await user.save();
+
+//     // Send the updated progress bar data back to the frontend
+//     res.json({
+//       solvedQuestions: totalSolved,
+//       leetcodeLastUpdated: user.leetcodeLastUpdated,
+//       striverDSAProgress: {
+//         solvedCount,
+//         totalCount: striverDSAProblems.length,
+//         progressPercentage: progress.toFixed(2),  // Rounded to 2 decimal places
+//       },
+//     });
+//   } catch (error) {
+//     console.error('Error fetching LeetCode progress:', error.message);
+//     res.status(500).json({ message: 'Server error' });
+//   }
+// });
+
+app.get("/get-progress/:userId", async (req, res) => {
+  const userId = req.params.userId;
+
+  try {
+    // Find the user by their userId
+    const user = await User.findOne({ uid: userId });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.leetcodeProfileId) {
+      return res.status(400).json({ message: "LeetCode username not linked" });
+    }
+
+    // Fetch user stats from the LeetCode API
+    const response = await axios.get(
+      `https://leetcode-api-faisalshohag.vercel.app/${user.leetcodeProfileId}`
+    );
+
+    if (!response.data || !response.data.recentSubmissions || !response.data.submissionCalendar) {
+      return res.status(500).json({ message: "Failed to fetch LeetCode stats" });
+    }
+
+    const { totalSolved, recentSubmissions, submissionCalendar } = response.data; // Extract total solved & recent submissions
+    console.log(totalSolved)
+    console.log(submissionCalendar)
+    // Fetch all Striver DSA problems from MongoDB
+    const striverDSAProblems = await Problem.find();
+
+    // Track solved count
+    let solvedCount = 0;
+
+    // Iterate over Striver's DSA problems
+    for (const problem of striverDSAProblems) {
+      // Check if the problem is in the user's recent submissions and is "Accepted"
+      if (
+        recentSubmissions.some(
+          (submission) =>
+            submission.titleSlug ===
+              problem.title.toLowerCase().replace(/ /g, "-") &&
+            submission.statusDisplay === "Accepted"
+        )
+      ) {
+        // problem.solved = true;
+        
+        solvedCount++;
+
+               // Add the problem to the user's solvedProblems array in the User collection
+               if (!user.solvedProblems.includes(problem.title)) {
+                user.solvedProblems.push(problem.title);
+              }
+      }
+    }
+
+    // Calculate progress percentage
+    const progress = (solvedCount / striverDSAProblems.length) * 100;
+
+    // Update the user's solved questions count
+    user.solvedQuestions = totalSolved;
+    user.submissionCalendar=submissionCalendar;
+    user.leetcodeLastUpdated = new Date();
+    await user.save();
+
+    // Send updated progress data to the frontend
+    res.json({
+      solvedQuestions: totalSolved,
+      leetcodeLastUpdated: user.leetcodeLastUpdated,
+      striverDSAProgress: {
+        solvedCount,
+        totalCount: striverDSAProblems.length,
+        progressPercentage: progress.toFixed(2), // Rounded to 2 decimal places
+      },
+      submissionCalendar:submissionCalendar,
+    });
+  } catch (error) {
+    console.error("Error fetching LeetCode progress:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// app.get("/get-progress/:userId", async (req, res) => {
+//   const userId = req.params.userId;
+
+//   try {
+//     // 1️⃣ Find the user in MongoDB
+//     const user = await User.findOne({ uid: userId });
+
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     if (!user.leetcodeProfileId) {
+//       return res.status(400).json({ message: "LeetCode username not linked" });
+//     }
+
+//     // 2️⃣ Fetch user submissions from LeetCode API
+//     const response = await axios.get(`https://leetcode-api-faisalshohag.vercel.app/${user.leetcodeProfileId}`);
+
+//     if (!response.data || !response.data.recentSubmissions) {
+//       return res.status(500).json({ message: "Failed to fetch LeetCode stats" });
+//     }
+
+//     const { totalSolved, recentSubmissions } = response.data; // Extract total solved count and submissions
+
+//     // 3️⃣ Compare solved problems with Striver's DSA Sheet
+//     let solvedProblems = [];
+
+//     striverDSAProblems.forEach((problem) => {
+//       if (
+//         recentSubmissions.some(
+//           (submission) =>
+//             submission.titleSlug === problem.title.toLowerCase().replace(/ /g, "-") &&
+//             submission.statusDisplay === "Accepted"
+//         )
+//       ) {
+//         solvedProblems.push(problem.title.toLowerCase().replace(/ /g, "-"));
+//       }
+//     });
+
+//     // 4️⃣ Calculate progress
+//     const solvedCount = solvedProblems.length;
+//     const progressPercentage = ((solvedCount / striverDSAProblems.length) * 100).toFixed(2);
+
+//     // 5️⃣ Update User Model
+//     user.solvedQuestions = totalSolved;
+//     user.solvedProblems = solvedProblems; // Store solved problems from Striver's sheet
+//     user.leetcodeLastUpdated = new Date();
+//     await user.save();
+
+//     // 6️⃣ Return the updated progress
+//     res.json({
+//       solvedQuestions: totalSolved,
+//       leetcodeLastUpdated: user.leetcodeLastUpdated,
+//       striverDSAProgress: {
+//         solvedCount,
+//         totalCount: striverDSAProblems.length,
+//         progressPercentage,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error fetching LeetCode progress:", error.message);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+app.get("/api/dsa-problems", async (req, res) => {
+  const userUID = req.query.uid; // Getting the user UID from query parameters
+
+  if (!userUID) {
+    return res.status(400).json({ error: "User UID is required" });
+  }
+
+  try {
+    // Fetch all DSA problems from the Problem model
+    const problems = await Problem.find({});
+
+    // Fetch the user data to get their solved problems (user schema should include this data)
+    const user = await User.findOne({ uid: userUID });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const solvedProblems = new Set(user.solvedProblems); // Use a Set to efficiently check if a problem is solved
+    console.log(solvedProblems)
+    // Mark each problem as solved or not based on the user’s solved problems
+    const problemsWithStatus = problems.map(problem => ({
+      ...problem.toObject(),
+      solved: solvedProblems.has(problem.title) // Check if the problem is in the solved list
+    }));
+    console.log(problemsWithStatus)
+    res.json(problemsWithStatus); // Send problems with their solved status
+  } catch (error) {
+    console.error("Error fetching DSA problems:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.patch("/api/dsa-problems/:title", async (req, res) => {  // Changed from :id to :title
+  const { title } = req.params;  // Get the problem title from URL params
+  const { solved, uid } = req.body;  // Get solved status and user ID from the request body
+  
+  console.log("Title received in backend:", title);  // Debugging: Check the title being passed
+  
+  try {
+    // Find the user by UID
+    const user = await User.findOne({ uid: uid });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Update the user's solvedProblems array
+    if (solved) {
+      // Add the problem to the solvedProblems array if it's marked as solved
+      if (!user.solvedProblems.includes(title)) {
+        user.solvedProblems.push(title);
+      }
+    } else {
+      // Remove the problem from the solvedProblems array if it's marked as unsolved
+      user.solvedProblems = user.solvedProblems.filter(problemTitle => problemTitle !== title);
+    }
+
+    // Save the user document with the updated solvedProblems array
+    await user.save();
+    res.status(200).json({ message: "Solved problems updated successfully" });
+  } catch (error) {
+    console.error("Error updating solved problems:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
+// // Route to update the solved status of a problem
+// app.patch("/api/dsa-problems/:id", async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { solved } = req.body;
+
+//     // Toggle the solved status based on the current value
+//     const newSolvedStatus = solved ? false : true;
+
+//     // Update the problem in the database with the new solved status
+//     const problem = await Problem.findOneAndUpdate(
+//       { id: id },
+//       { solved: newSolvedStatus },
+//       { new: true }
+//     );
+
+//     if (!problem) {
+//       return res.status(404).json({ error: "Problem not found" });
+//     }
+
+//     res.json({ message: "Solved status updated successfully", problem });
+//   } catch (error) {
+//     res.status(500).json({ error: "Internal server error" });
+//   }
+// });
+
 
 
 app.post('/create-profile', upload.single('profilePic'), async (req, res) => {
-  const { uid, username, email, preferredLanguage, preferredSolvingTime } = req.body;
+  const { uid, username, email, preferredLanguage, preferredSolvingTime,leetcodeProfileId } = req.body;
   console.log("username",username)
-  if (!username || !uid || !email || !preferredLanguage || !preferredSolvingTime || !req.file) {
+  console.log("username",leetcodeProfileId)
+  if (!username || !uid || !email || !preferredLanguage || !preferredSolvingTime || !leetcodeProfileId || !req.file) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
@@ -371,6 +1049,7 @@ app.post('/create-profile', upload.single('profilePic'), async (req, res) => {
       preferredLanguage,
       preferredSolvingTime,
       profilePic: profilePicUrl,
+      leetcodeProfileId,
     });
     //console.log(existingUser)
     //console.log("newuser:",newUser)
@@ -382,6 +1061,9 @@ app.post('/create-profile', upload.single('profilePic'), async (req, res) => {
     res.status(500).json({ message: 'Error creating profile', error: err.message });
   }
 });
+
+
+
 
 app.put('/update-profile', upload.single('profilePic'), async (req, res) => {
   const { uid, username, preferredLanguage, preferredSolvingTime } = req.body;
@@ -453,6 +1135,6 @@ app.get('/user/:uid', async (req, res) => {
 
 // Start the server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
+app.listen(PORT, () => console.log(`Server running on port ${PORT} ${baseUrl}`));
+console.log(PORT);
 module.exports = app; // Export for testing or further modularization

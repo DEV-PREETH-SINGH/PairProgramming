@@ -1,18 +1,20 @@
-import {baseUrl} from "@env";
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, ActivityIndicator, Alert, Image, TouchableOpacity,Button } from 'react-native';
+import { baseUrl } from "@env";
+import React, { useState, useEffect, useContext } from 'react';
+import { View, Text, TextInput, StyleSheet, ActivityIndicator, Alert, Image, TouchableOpacity, Button } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { UserContext } from '../context/UserContext'; // Import UserContext
 
 const ProfileEditScreen = ({ navigation }) => {
+  const { user, setUser } = useContext(UserContext); // Use context
   const [username, setUsername] = useState('');
   const [preferredLanguage, setPreferredLanguage] = useState('');
   const [preferredSolvingTime, setPreferredSolvingTime] = useState('');
   const [profilePic, setProfilePic] = useState(null);
   const [loading, setLoading] = useState(false);
-  
+
   const currentUserUID = auth().currentUser?.uid;
 
   useEffect(() => {
@@ -21,7 +23,6 @@ const ProfileEditScreen = ({ navigation }) => {
     const fetchUserData = async () => {
       try {
         setLoading(true);
-        // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
         const response = await axios.get(`${baseUrl}/user/${currentUserUID}`);
         const { username, preferredLanguage, preferredSolvingTime, profilePic } = response.data;
 
@@ -29,6 +30,9 @@ const ProfileEditScreen = ({ navigation }) => {
         setPreferredLanguage(preferredLanguage || '');
         setPreferredSolvingTime(preferredSolvingTime || '');
         setProfilePic(profilePic || null);
+
+        // Update UserContext when data is fetched
+        setUser({ username, profilePic });
       } catch (error) {
         Alert.alert('Error', 'Failed to load user data.');
       } finally {
@@ -72,12 +76,16 @@ const ProfileEditScreen = ({ navigation }) => {
           type: 'image/jpeg',
         });
       }
-      // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
+
       await axios.put(`${baseUrl}/update-profile`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       Alert.alert('Success', 'Profile updated successfully');
+
+      // Update UserContext after profile update
+      setUser({ username, profilePic });
+
       navigation.goBack();
     } catch (error) {
       Alert.alert('Error', 'Failed to update profile.');
@@ -124,14 +132,14 @@ const ProfileEditScreen = ({ navigation }) => {
         <Text style={styles.buttonText}>Update Profile</Text>
       </TouchableOpacity>
       <TouchableOpacity 
-            style={styles.button} 
-            onPress={() => {
-            auth().signOut(); // Sign out the user
-            navigation.replace('Login'); // Redirect to the login screen
-            }} >
+        style={styles.button} 
+        onPress={() => {
+          auth().signOut();
+          navigation.replace('Login');
+        }} 
+      >
         <Text style={styles.buttonText}>Log out</Text>
       </TouchableOpacity>
-   
     </View>
   );
 };
@@ -202,13 +210,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 20,
   },
-  buttonDisabled: {
-    backgroundColor: '#A0A0A0',
-  },
   buttonText: {
     color: 'white',
-    // fontSize: 18,
-    // fontWeight: 'bold',
   },
 });
 

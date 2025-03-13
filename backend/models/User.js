@@ -3,13 +3,10 @@ const mongoose = require('mongoose');
 // Define the updated User schema
 const UserSchema = new mongoose.Schema({
   username: { 
-    type: String, 
-    //required: true 
+    type: String
   },
   email: { 
-    type: String, 
-    //required: true, 
-    //unique: true 
+    type: String
   },
   uid: { 
     type: String, 
@@ -25,18 +22,45 @@ const UserSchema = new mongoose.Schema({
     default: false 
   },
   preferredLanguage: { 
-    type: String, 
-    
+    type: String
   },
   preferredSolvingTime: { 
-    type: String, 
-    
+    type: String
   },
   profilePic: { 
-    type: String, 
-    
-  
+    type: String
   }, // Store image URL
+
+  // 🟢 LeetCode Integration
+  leetcodeProfileId: { 
+    type: String, 
+    default: ""
+  },
+  solvedQuestions: { 
+    type: Number, 
+    default: 0 
+  },
+  solvedProblems: { 
+    type: [String], 
+    default: [] 
+  },
+  leetcodeLastUpdated: { 
+    type: Date, 
+    default: null 
+  },
+  partner: { 
+    type: String,
+    default: null
+  }, // Stores the partner's user ID
+  pendingRequest: { 
+    type: [String], 
+    default: []
+  }, // Stores the user ID of the pending request
+  streakCount:{
+    type:Number,
+    default:0
+  },
+  
 });
 
 // Create a User model based on the updated schema

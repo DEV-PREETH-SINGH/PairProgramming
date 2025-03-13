@@ -1,53 +1,82 @@
-// ChatListScreen.js (React Native)
-import {baseUrl} from "@env";
+import { baseUrl } from "@env";
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity,Image,Button, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image, Button, StyleSheet } from 'react-native';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import auth from '@react-native-firebase/auth';
-import { ChevronLeft,MessageCircle } from 'lucide-react-native';
+import { ChevronLeft, MessageCircle } from 'lucide-react-native';
 
 const ChatListScreen = () => {
   const [chatUsers, setChatUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [partnerUID, setPartnerUID] = useState(null); // State to store partner UID
+  const [streakCount, setStreakCount] = useState(null); // State to store streak count
   const navigation = useNavigation();
-  const currentUserUID = auth().currentUser?.uid; // Replace with actual current user UID
-console.log(currentUserUID)
-useEffect(() => {
-  const fetchChatUsers = async () => {
-    if (!currentUserUID) {
-      console.error('User UID is not available');
-      setLoading(false);
-      return;
-    }
+  const currentUserUID = auth().currentUser?.uid; // Get current user UID
 
-    try {
-      // const baseUrl = process.env.BASE_URL || 'http://192.168.68.50:5000'; // Default to localhost for development
-      const response = await axios.get(`${baseUrl}/get-chat-users`, {
-        params: { uid: currentUserUID }
-      });
-
-      setChatUsers(response.data);
-      console.log(response.data); // Log the data to check
-
-      if (response.data.length === 0) {
-        console.log('No chat users found');
+  useEffect(() => {
+    const fetchPartnerUID = async () => {
+      if (!currentUserUID) {
+        console.error('User UID is not available');
+        return;
       }
 
-      setChatUsers(response.data); // Set the chat users from the response
-    } catch (error) {
-      console.error('Error fetching chat users:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        const response = await axios.get(`${baseUrl}/get-partner`, {
+          params: { uid: currentUserUID },
+        });
+        setPartnerUID(response.data.partnerUID); // Assuming response contains partner UID
+        console.log("FROM FRONTEND:", response.data.partnerUID);
+      } catch (error) {
+        console.error('Error fetching partner UID:', error);
+      }
+    };
 
-  fetchChatUsers();
-}, [currentUserUID]);
+    const fetchChatUsers = async () => {
+      if (!currentUserUID) {
+        console.error('User UID is not available');
+        setLoading(false);
+        return;
+      }
 
+      try {
+        const response = await axios.get(`${baseUrl}/get-chat-users`, {
+          params: { uid: currentUserUID },
+        });
+
+        setChatUsers(response.data);
+        console.log(response.data); // Log the data to check
+
+        if (response.data.length === 0) {
+          console.log('No chat users found');
+        }
+
+      } catch (error) {
+        console.error('Error fetching chat users:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const fetchStreak = async () => {
+      if (!partnerUID) return;
+
+      try {
+        const response = await axios.post(`${baseUrl}/api/messages/check-streak`, { userAUID: currentUserUID });
+        setStreakCount(response.data.streakCount); // Set streak count from API response
+      } catch (error) {
+        console.error('Error fetching streak:', error);
+      }
+    };
+
+    fetchPartnerUID(); // Fetch partner UID
+    fetchChatUsers(); // Fetch chat users
+    fetchStreak(); // Fetch streak count
+
+  }, [currentUserUID, partnerUID]);
 
   const navigateToChat = (userUID) => {
-    console.log("another person userid",userUID)
+    console.log("Navigating to chat with user:", userUID);
     navigation.navigate('Chat', { userUID });
   };
 
@@ -59,17 +88,16 @@ useEffect(() => {
     return (
       <View style={styles.noChatContainer}>
         <Image
-                  source={require('../assets/StartConversation.jpg')} // Replace with your image URL
-                  style={styles.emptyImage}
-                />
-        <Text style={styles.noChatText} >No chats yet? Say hi to someone!</Text>
+          source={require('../assets/StartConversation.jpg')} // Replace with your image URL
+          style={styles.emptyImage}
+        />
+        <Text style={styles.noChatText}>No chats yet? Say hi to someone!</Text>
       </View>
     );
   }
 
-    return (
+  return (
     <View style={styles.container}>
-      
       <FlatList
         data={chatUsers}
         keyExtractor={(item) => item._id}
@@ -77,10 +105,17 @@ useEffect(() => {
           <TouchableOpacity
             style={styles.userItem}
             onPress={() => navigateToChat(item._id)}>
-            
             <Image source={{ uri: item.profilePic }} style={styles.profilePic} />
-            <Text style={styles.userName}>{item.username}</Text> 
-            
+            <View style={styles.userNameContainer}>
+              <Text style={styles.userName}>{item.username}</Text>
+              {/* Display "My Partner" if the user is the current user's partner */}
+              {partnerUID && partnerUID === item._id && (
+                <Text style={styles.partnerLabel}>My Partner</Text>
+              )}
+            </View>
+            {streakCount !== null && partnerUID === item._id && (
+              <Text style={styles.streakText}>My Streak: {streakCount}</Text> // Display streak count
+            )}
             <MessageCircle size={20} color="#000" style={styles.icon} />
           </TouchableOpacity>
         )}
@@ -89,10 +124,8 @@ useEffect(() => {
   );
 };
 
-
 const styles = StyleSheet.create({
   container: {
-    // backgroundColor:'white',
     flex: 1,
     padding: 20,
   },
@@ -102,34 +135,46 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   userItem: {
-    flexDirection: 'row', // Align profile pic, username, and icon horizontally
+    flexDirection: 'row', 
     padding: 10,
     borderBottomWidth: 1,
     borderColor: '#ccc',
-    alignItems: 'center', // Align items vertically
-    justifyContent: 'space-between', // Space out items: profile pic + username on the left, icon on the right
+    alignItems: 'center', 
+    justifyContent: 'space-between',
   },
   profilePic: {
-    width: 50, // Size of the profile picture
+    width: 50,
     height: 50,
-    borderRadius: 25, // Make the profile picture circular
-    marginRight: 10, // Space between profile picture and username
+    borderRadius: 25,
+    marginRight: 10,
+  },
+  userNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   userName: {
     fontSize: 18,
   },
+  partnerLabel: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#888',
+  },
+  streakText: {
+    fontSize: 14,
+    color: '#4CAF50', // Green color for streak text
+  },
   icon: {
-    marginLeft: 'auto', // Push the icon to the right side of the container
+    marginLeft: 'auto', 
   },
   noChatContainer: {
-    backgroundColor:'white',
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   noChatText: {
     fontSize: 18,
-    color: '#888', // Customize the color as needed
+    color: '#888',
   },
   emptyImage: {
     width: 250,
@@ -137,4 +182,5 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 });
+
 export default ChatListScreen;

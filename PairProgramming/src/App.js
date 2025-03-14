@@ -1,8 +1,8 @@
 import {PORT} from "@env"
-console.log('PORT:',PORT)
+console.log('from app.js:PORT:',PORT)
 
-console.log("Type of PORT:", typeof PORT);
-console.log("PORT:", JSON.stringify(PORT, null, 2));
+console.log("from app.js:Type of PORT:", typeof PORT);
+console.log("from app.js:PORT:", JSON.stringify(PORT, null, 2));
 
 
 import React from 'react';

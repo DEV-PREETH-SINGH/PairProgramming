@@ -3,29 +3,128 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const multer = require('multer');
 const axios = require('axios');
-
 const bodyParser = require('body-parser');
 require('dotenv').config();
 const router = express.Router();
-//socket.io
 const moment = require('moment');
 const app = express();
-// Middleware
 const http = require('http');
-const socketIo = require('socket.io');
 const server = http.createServer(app);
-const io = socketIo(server);
-app.use(cors());
+
+// Middleware
 app.use(bodyParser.json());
 app.use('/uploads', express.static('uploads')); // Serve images from 'uploads' folder
-// Import User model
-const User = require('./models/User');
-// Import Message model
-const Message = require('./models/message'); // Assuming you have created this in the models folder
+app.use(cors());
 
-const baseUrl = 'http://192.168.68.73:5000'; // Default to localhost for development
-console.log(baseUrl);
+// Import models
+const User = require('./models/User');
+const Message = require('./models/message');
 const Problem = require("./models/striver79DsaSheetProblems");
+
+const baseUrl = 'http://172.20.10.3:5000'; // Default to localhost for development
+console.log(baseUrl);
+
+// Socket.io setup with CORS
+const io = require("socket.io")(server, {
+  cors: { 
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Map to store user ID to socket ID connections
+const userSocketMap = {};
+
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+  io.emit("user connected", { message: "A new user has joined" });
+  
+  // Handle user connection with their UID
+  socket.on('userConnected', (data) => {
+    if (data.userId) {
+      console.log(`User ${data.userId} connected with socket ${socket.id}`);
+      userSocketMap[data.userId] = socket.id;
+      socket.join(data.userId); // Join a room with user's ID
+    }
+  });
+
+  // socket.on("sendMessage", async ({ senderUID, receiverUID, message }) => {
+  //   try {
+  //     // Create new message
+  //     const newMessage = new Message({ 
+  //       senderUID, 
+  //       receiverUID, 
+  //       message,
+  //       isRead: false,
+  //       timestamp: new Date()
+  //     });
+      
+  //     await newMessage.save();
+      
+  //     // Emit to the receiver's room
+  //     io.emit("newMessage", { 
+  //       senderId: senderUID,
+  //       receiverId: receiverUID,
+  //       message: message,
+  //       messageId: newMessage._id
+  //     });
+      
+  //     console.log(`Message sent from ${senderUID} to ${receiverUID}`);
+  //   } catch (error) {
+  //     console.error("Error saving message:", error);
+  //   }
+  // });
+  
+  // Handle marking messages as read
+  socket.on('markAsRead', async ({ userId, chatPartnerId }) => {
+    try {
+      await Message.updateMany(
+        { senderUId: chatPartnerId, receiverUId: userId, isRead: false },
+        { $set: { isRead: true } }
+      );
+      
+      console.log(`Marked messages as read from ${chatPartnerId} to ${userId}`);
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    // Remove user from socket map
+    const userId = Object.keys(userSocketMap).find(key => userSocketMap[key] === socket.id);
+    if (userId) {
+      delete userSocketMap[userId];
+      console.log(`User ${userId} disconnected`);
+    }
+    console.log("User disconnected:", socket.id);
+  });
+});
+
+// Get unread messages
+app.get("/get-unread-messages", async (req, res) => {
+  try {
+    const { uid } = req.query;
+    
+    // Make sure field names match your model schema (receiverUId vs receiverId)
+    const unreadMessages = await Message.aggregate([
+      { $match: { receiverUID: uid, isRead: false } },
+      { $group: { _id: "$senderUID", count: { $sum: 1 } } },
+    ]);
+    
+    const unreadStatus = {};
+    unreadMessages.forEach((msg) => {
+      unreadStatus[msg._id] = true; // Mark sender as having unread messages
+    });
+    
+    res.json(unreadStatus);
+  } catch (error) {
+    console.error("Error fetching unread messages:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+//---claude code
+
 
 
 app.use('/uploads', express.static('uploads')); // Serve images from 'uploads' folder
@@ -251,37 +350,37 @@ app.get('/api/messages/get-messages', async (req, res) => {
 });
 
 // WebSocket connection event
-io.on('connection', (socket) => {
-  console.log('A user connected', socket.id);
+// io.on('connection', (socket) => {
+//   console.log('A user connected', socket.id);
 
-  socket.on('sendMessage', async (messageData) => {
-    console.log('Message received:', messageData);
+//   socket.on('sendMessage', async (messageData) => {
+//     console.log('Message received:', messageData);
 
-    try {
-      const { senderUID, receiverUID, message } = messageData;
+//     try {
+//       const { senderUID, receiverUID, message } = messageData;
 
-      const newMessage = new Message({
-        senderUID,
-        receiverUID,
-        message,
-        timestamp: new Date(),
-      });
+//       const newMessage = new Message({
+//         senderUID,
+//         receiverUID,
+//         message,
+//         timestamp: new Date(),
+//       });
 
-      const savedMessage = await newMessage.save();
+//       const savedMessage = await newMessage.save();
 
-      // Emit only to sender and receiver instead of broadcasting
-      socket.to(receiverUID).emit('newMessage', savedMessage);
-      socket.emit('messageSent', savedMessage);
-    } catch (err) {
-      console.error('Error handling sendMessage:', err);
-      socket.emit('error', { message: 'Error sending message', error: err.message });
-    }
-  });
+//       // Emit only to sender and receiver instead of broadcasting
+//       socket.to(receiverUID).emit('newMessage', savedMessage);
+//       socket.emit('messageSent', savedMessage);
+//     } catch (err) {
+//       console.error('Error handling sendMessage:', err);
+//       socket.emit('error', { message: 'Error sending message', error: err.message });
+//     }
+//   });
 
-  socket.on('disconnect', () => {
-    console.log('User disconnected', socket.id);
-  });
-});
+//   socket.on('disconnect', () => {
+//     console.log('User disconnected', socket.id);
+//   });
+// });
 
 // Endpoint to send a new message
 app.post('/api/messages/send-message', async (req, res) => {
@@ -788,6 +887,88 @@ app.post('/api/messages/check-streak', async (req, res) => {
 //   }
 // });
 
+// app.get("/get-progress/:userId", async (req, res) => {
+//   const userId = req.params.userId;
+
+//   try {
+//     // Find the user by their userId
+//     const user = await User.findOne({ uid: userId });
+
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     if (!user.leetcodeProfileId) {
+//       return res.status(400).json({ message: "LeetCode username not linked" });
+//     }
+
+//     // Fetch user stats from the LeetCode API
+//     const response = await axios.get(
+//       `https://leetcode-api-faisalshohag.vercel.app/${user.leetcodeProfileId}`
+//     );
+
+//     if (!response.data || !response.data.recentSubmissions || !response.data.submissionCalendar) {
+//       return res.status(500).json({ message: "Failed to fetch LeetCode stats" });
+//     }
+
+//     const { totalSolved, recentSubmissions, submissionCalendar } = response.data; // Extract total solved & recent submissions
+//     console.log(totalSolved)
+//     console.log(submissionCalendar)
+//     // Fetch all Striver DSA problems from MongoDB
+//     const striverDSAProblems = await Problem.find();
+
+//     // Track solved count
+//     let solvedCount = 0;
+
+//     // Iterate over Striver's DSA problems
+//     for (const problem of striverDSAProblems) {
+//       // Check if the problem is in the user's recent submissions and is "Accepted"
+//       if (
+//         recentSubmissions.some(
+//           (submission) =>
+//             submission.titleSlug ===
+//               problem.title.toLowerCase().replace(/ /g, "-") &&
+//             submission.statusDisplay === "Accepted"
+//         )
+//       ) {
+//         // problem.solved = true;
+        
+//         solvedCount++;
+
+//                // Add the problem to the user's solvedProblems array in the User collection
+//                if (!user.solvedProblems.includes(problem.title)) {
+//                 user.solvedProblems.push(problem.title);
+//               }
+//       }
+//     }
+
+//     // Calculate progress percentage
+//     const progress = (solvedCount / striverDSAProblems.length) * 100;
+
+//     // Update the user's solved questions count
+//     user.solvedQuestions = totalSolved;
+//     user.submissionCalendar=submissionCalendar;
+//     user.leetcodeLastUpdated = new Date();
+//     await user.save();
+
+//     // Send updated progress data to the frontend
+//     res.json({
+//       solvedQuestions: totalSolved,
+//       leetcodeLastUpdated: user.leetcodeLastUpdated,
+//       striverDSAProgress: {
+//         solvedCount,
+//         totalCount: striverDSAProblems.length,
+//         progressPercentage: progress.toFixed(2), // Rounded to 2 decimal places
+//       },
+//       submissionCalendar:submissionCalendar,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching LeetCode progress:", error.message);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+//for new ui
 app.get("/get-progress/:userId", async (req, res) => {
   const userId = req.params.userId;
 
@@ -812,9 +993,24 @@ app.get("/get-progress/:userId", async (req, res) => {
       return res.status(500).json({ message: "Failed to fetch LeetCode stats" });
     }
 
-    const { totalSolved, recentSubmissions, submissionCalendar } = response.data; // Extract total solved & recent submissions
-    console.log(totalSolved)
-    console.log(submissionCalendar)
+    const { 
+      totalSolved, 
+      totalSubmissions, 
+      ranking, 
+      contributionPoint, 
+      reputation, 
+      submissionCalendar, 
+      easySolved, 
+      totalEasy, 
+      mediumSolved, 
+      totalMedium, 
+      hardSolved, 
+      totalHard 
+    } = response.data; // Extract new statistics
+    
+    console.log(totalSolved);
+    console.log(submissionCalendar);
+
     // Fetch all Striver DSA problems from MongoDB
     const striverDSAProblems = await Problem.find();
 
@@ -825,49 +1021,58 @@ app.get("/get-progress/:userId", async (req, res) => {
     for (const problem of striverDSAProblems) {
       // Check if the problem is in the user's recent submissions and is "Accepted"
       if (
-        recentSubmissions.some(
+        response.data.recentSubmissions.some(
           (submission) =>
             submission.titleSlug ===
               problem.title.toLowerCase().replace(/ /g, "-") &&
             submission.statusDisplay === "Accepted"
         )
       ) {
-        // problem.solved = true;
-        
         solvedCount++;
 
-               // Add the problem to the user's solvedProblems array in the User collection
-               if (!user.solvedProblems.includes(problem.title)) {
-                user.solvedProblems.push(problem.title);
-              }
+        // Add the problem to the user's solvedProblems array in the User collection
+        if (!user.solvedProblems.includes(problem.title)) {
+          user.solvedProblems.push(problem.title);
+        }
       }
     }
 
-    // Calculate progress percentage
+    // Calculate progress percentage for Striver DSA problems
     const progress = (solvedCount / striverDSAProblems.length) * 100;
 
-    // Update the user's solved questions count
+    // Update the user's solved questions count and other stats
     user.solvedQuestions = totalSolved;
-    user.submissionCalendar=submissionCalendar;
+    user.submissionCalendar = submissionCalendar;
     user.leetcodeLastUpdated = new Date();
     await user.save();
 
     // Send updated progress data to the frontend
     res.json({
       solvedQuestions: totalSolved,
-      leetcodeLastUpdated: user.leetcodeLastUpdated,
+      totalSubmissions,
+      ranking,
+      contributionPoint,
+      reputation,
+      submissionCalendar,
       striverDSAProgress: {
         solvedCount,
         totalCount: striverDSAProblems.length,
         progressPercentage: progress.toFixed(2), // Rounded to 2 decimal places
       },
-      submissionCalendar:submissionCalendar,
+      easySolved,
+      totalEasy,
+      mediumSolved,
+      totalMedium,
+      hardSolved,
+      totalHard,
+      striverDSAProgressPercentage: progress.toFixed(2),
     });
   } catch (error) {
     console.error("Error fetching LeetCode progress:", error.message);
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 // app.get("/get-progress/:userId", async (req, res) => {
 //   const userId = req.params.userId;
@@ -1135,6 +1340,12 @@ app.get('/user/:uid', async (req, res) => {
 
 // Start the server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT} ${baseUrl}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT} ${baseUrl}`));
 console.log(PORT);
 module.exports = app; // Export for testing or further modularization
+
+
+// // const PORT = process.env.PORT || 5000;
+// server.listen(PORT, '0.0.0.0', () => {
+//   console.log(`Test server running at http://0.0.0.0:${PORT}`);
+// });

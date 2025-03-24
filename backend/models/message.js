@@ -21,6 +21,7 @@ const messageSchema = new mongoose.Schema({
     default: Date.now, // Automatically set the current date and time
     required: true,    // Ensure a timestamp is always present
   },
+  isRead: { type: Boolean, default: false }
 });
 
 // Create the Message model from the schema

@@ -25,7 +25,7 @@ const Header = ({ uid }) => {
   }, [uid]);
 
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, backgroundColor: '#f8f8f8' }}>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, backgroundColor: "#f0f7ff" }}>
       {/* Left section with "Hello" and username on separate lines */}
       <View style={{ flexDirection: 'column' }}>
         <Text style={{ fontSize: 18, fontWeight: 'bold' }}>

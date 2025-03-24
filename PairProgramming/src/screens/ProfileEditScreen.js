@@ -6,6 +6,7 @@ import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { UserContext } from '../context/UserContext'; // Import UserContext
+import { ChevronLeft, MessageCircle } from 'lucide-react-native';
 
 const ProfileEditScreen = ({ navigation }) => {
   const { user, setUser } = useContext(UserContext); // Use context
@@ -24,16 +25,27 @@ const ProfileEditScreen = ({ navigation }) => {
       try {
         setLoading(true);
         const response = await axios.get(`${baseUrl}/user/${currentUserUID}`);
+        console.log(response.data)
         const { username, preferredLanguage, preferredSolvingTime, profilePic } = response.data;
-
+        console.log("step2 working")
         setUsername(username || '');
+        console.log("step3 working")
+
         setPreferredLanguage(preferredLanguage || '');
+        console.log("step4 working")
+
         setPreferredSolvingTime(preferredSolvingTime || '');
+        console.log("step5 working")
+
         setProfilePic(profilePic || null);
+        console.log("step6 working")
+
 
         // Update UserContext when data is fetched
-        setUser({ username, profilePic });
+        // setUser({ username, profilePic });
+        console.log("working")
       } catch (error) {
+        console.log("not working")
         Alert.alert('Error', 'Failed to load user data.');
       } finally {
         setLoading(false);
@@ -84,7 +96,7 @@ const ProfileEditScreen = ({ navigation }) => {
       Alert.alert('Success', 'Profile updated successfully');
 
       // Update UserContext after profile update
-      setUser({ username, profilePic });
+      // setUser({ username, profilePic });
 
       navigation.goBack();
     } catch (error) {
@@ -95,62 +107,73 @@ const ProfileEditScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Edit Profile</Text>
-      {loading && <ActivityIndicator size="large" color="#000" />}
-      <TouchableOpacity onPress={selectImage} style={styles.imageContainer}>
-        {profilePic ? (
-          <Image source={{ uri: profilePic }} style={styles.profilePic} />
-        ) : (
-          <Text style={styles.imagePlaceholder}>Select Profile Picture</Text>
-        )}
-      </TouchableOpacity>
-      <TextInput
-        style={styles.input}
-        value={username}
-        onChangeText={setUsername}
-        placeholder="User Name"
-        placeholderTextColor="#888"
-      />
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={preferredLanguage} style={styles.picker} onValueChange={setPreferredLanguage}>
-          <Picker.Item label="Select Programming Language" value={null} />
-          <Picker.Item label="C" value="C" />
-          <Picker.Item label="C++" value="C++" />
-          <Picker.Item label="Python" value="Python" />
-        </Picker>
+    <View style={styles.mainContainer}>
+      <View style={styles.topBar}>
+        <ChevronLeft size={30} color="#aaa" onPress={() => navigation.goBack()} />
+        <Text style={styles.heading}>Edit Profile</Text>
       </View>
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={preferredSolvingTime} style={styles.picker} onValueChange={setPreferredSolvingTime}>
-          <Picker.Item label="Select Preferred Coding Time" value={null} />
-          <Picker.Item label="Morning" value="Morning" />
-          <Picker.Item label="Afternoon" value="Afternoon" />
-          <Picker.Item label="Evening" value="Evening" />
-        </Picker>
+      
+      <View style={styles.container}>
+        {/* <Text style={styles.header}>Edit Profile</Text> */}
+        {loading && <ActivityIndicator size="large" color="#000" />}
+        <TouchableOpacity onPress={selectImage} style={styles.imageContainer}>
+          {profilePic ? (
+            <Image source={{ uri: profilePic }} style={styles.profilePic} />
+          ) : (
+            <Text style={styles.imagePlaceholder}>Select Profile Picture</Text>
+          )}
+        </TouchableOpacity>
+        <TextInput
+          style={styles.input}
+          value={username}
+          onChangeText={setUsername}
+          placeholder="User Name"
+          placeholderTextColor="#888"
+        />
+        <View style={styles.pickerContainer}>
+          <Picker selectedValue={preferredLanguage} style={styles.picker} onValueChange={setPreferredLanguage}>
+            <Picker.Item label="Select Programming Language" value={null} />
+            <Picker.Item label="C" value="C" />
+            <Picker.Item label="C++" value="C++" />
+            <Picker.Item label="Python" value="Python" />
+          </Picker>
+        </View>
+        <View style={styles.pickerContainer}>
+          <Picker selectedValue={preferredSolvingTime} style={styles.picker} onValueChange={setPreferredSolvingTime}>
+            <Picker.Item label="Select Preferred Coding Time" value={null} />
+            <Picker.Item label="Morning" value="Morning" />
+            <Picker.Item label="Afternoon" value="Afternoon" />
+            <Picker.Item label="Evening" value="Evening" />
+          </Picker>
+        </View>
+        <TouchableOpacity style={styles.button} onPress={handleUpdateProfile} disabled={loading}>
+          <Text style={styles.buttonText}>Update Profile</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.button} 
+          onPress={() => {
+            auth().signOut();
+            navigation.replace('Login');
+          }} 
+        >
+          <Text style={styles.buttonText}>Log out</Text>
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.button} onPress={handleUpdateProfile} disabled={loading}>
-        <Text style={styles.buttonText}>Update Profile</Text>
-      </TouchableOpacity>
-      <TouchableOpacity 
-        style={styles.button} 
-        onPress={() => {
-          auth().signOut();
-          navigation.replace('Login');
-        }} 
-      >
-        <Text style={styles.buttonText}>Log out</Text>
-      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+    backgroundColor: "#f0f7ff",
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#f7f7f7',
+    backgroundColor: "#f0f7ff",
   },
   header: {
     fontSize: 26,
@@ -212,6 +235,23 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 0,
+    paddingTop: 5,
+    marginLeft: 0,
+    marginTop: 0,
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    zIndex: 10,
+  },
+  heading: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 5,
   },
 });
 

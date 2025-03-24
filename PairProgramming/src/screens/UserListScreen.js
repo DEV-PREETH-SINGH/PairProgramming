@@ -1,14 +1,40 @@
 import {baseUrl} from "@env";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import axios from 'axios';
 import auth from '@react-native-firebase/auth';
 import Swiper from 'react-native-deck-swiper';
 import { ChevronLeft, MessageCircle } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 const UserListScreen = ({ navigation }) => {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState(null);
+  const swiperRef = useRef(null);
+
+  // Call the start-today API when the screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const callStartTodayAPI = async () => {
+        try {
+          const currentUserUID = auth().currentUser?.uid;
+          if (!currentUserUID) {
+            console.error('No user is currently logged in');
+            return;
+          }
+          
+          const response = await axios.post(`${baseUrl}/start-today`, {
+            uid: currentUserUID
+          });
+          console.log('Start Today API response:', response.data);
+        } catch (error) {
+          console.error('Error calling Start Today API:', error);
+        }
+      };
+      
+      callStartTodayAPI();
+    }, [])
+  );
 
   useEffect(() => {
     const fetchUserList = async () => {
@@ -50,15 +76,24 @@ const UserListScreen = ({ navigation }) => {
     // Logic to handle swiping left (skip user)
   };
 
+  // Handle when all cards are swiped
+  const handleAllSwiped = () => {
+    // Reset the swiper to start from the first card again
+    if (swiperRef.current && users.length > 0) {
+      swiperRef.current.jumpToCardIndex(0);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.topBar}>
+      {/* <View style={styles.topBar}>
         <ChevronLeft size={30} color="#aaa" onPress={() => navigation.goBack()} />
         <Text style={styles.heading}>CodeBuddies for Today</Text>
-      </View>
+      </View> */}
 
       {users.length > 0 ? (
         <Swiper
+          ref={swiperRef}
           cards={users}
           renderCard={(user) => (
             <View style={styles.userCard}>
@@ -73,9 +108,11 @@ const UserListScreen = ({ navigation }) => {
           )}
           onSwipedRight={handleSwipedRight}
           onSwipedLeft={handleSwipedLeft}
+          onSwipedAll={handleAllSwiped}
           cardIndex={0}
           backgroundColor={'transparent'}
           stackSize={3}
+          infinite={true}
         />
       ) : (
         <View style={styles.noUsersContainer}>
@@ -90,40 +127,28 @@ const UserListScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'white',
+    backgroundColor: "#f0f7ff",
     flex: 1,
     padding: 20,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  heading: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginLeft: 10,
-    paddingRight: 50,
-    flex: 1,
-    textAlign: 'center',
+    justifyContent: 'center',
   },
   userCard: {
     justifyContent: 'center',
     alignItems: 'center',
-    height: '90%', // Take up most of the screen
+    height: '90%', // Equal spacing from top and bottom
     borderRadius: 10,
+    marginTop:-40,
   },
   profilePic: {
-    width: '100%', // Full width of the screen
-    height: '100%', // Full height of the screen
+    width: '100%',
+    height: '100%',
     borderRadius: 10,
   },
   nameContainer: {
     position: 'absolute',
-    bottom: 20, // Position the name at the bottom of the card
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Transparent background
+    bottom: 20,
+    left: 20, // Name on the left side
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     paddingVertical: 5,
     paddingHorizontal: 15,
     borderRadius: 25,
@@ -132,23 +157,25 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 20,
     fontWeight: 'bold',
-    textAlign: 'center',
+    textAlign: 'left',
   },
   noUsersContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  emptyImage: {
-    width: 150,
-    height: 150,
-    marginBottom: 20,
-  },
   noUsersText: {
     fontSize: 16,
     color: 'gray',
     textAlign: 'center',
   },
+  emptyImage: {
+    width: 150,
+    height: 150,
+    marginBottom: 20,
+  },
 });
 
 export default UserListScreen;
+
+//going to work on 5)

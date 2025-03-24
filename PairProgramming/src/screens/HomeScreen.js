@@ -302,6 +302,8 @@ const HomeScreen = ({ navigation }) => {
       screenOptions={{
         tabBarStyle: styles.tabBar,
         tabBarShowLabel: false,
+        // borderTopWidth: 0, // Removes the top line
+        // elevation: 0, // Removes shadow on Android
       }}
     >
       <Tab.Screen
@@ -448,9 +450,10 @@ const styles = StyleSheet.create({
   },
   // Tab navigation styling
   tabBar: {
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
+    backgroundColor: "#f0f7ff",
+     borderTopWidth: 0,
+     elevation: 0,
+     borderTopColor: "#e0e0e0",
     height: 60,
     paddingBottom: 5,
   },

@@ -21,7 +21,7 @@ const User = require('./models/User');
 const Message = require('./models/message');
 const Problem = require("./models/striver79DsaSheetProblems");
 
-const baseUrl = 'http://172.20.10.3:5000'; // Default to localhost for development
+const baseUrl = 'http://192.168.68.67:5000'; // Default to localhost for development
 console.log(baseUrl);
 
 // Socket.io setup with CORS
@@ -74,6 +74,44 @@ io.on("connection", (socket) => {
   //     console.error("Error saving message:", error);
   //   }
   // });
+
+   // Handle joining a specific chat
+   socket.on('joinChat', ({ user1, user2 }) => {
+    // Create a unique room for this chat pair
+    const chatRoom = [user1, user2].sort().join('_');
+    socket.join(chatRoom);
+    console.log(`User joined chat room: ${chatRoom}`);
+  });
+
+  // Handle sending a message
+  socket.on('sendMessage', async ({ senderUID, receiverUID, message }, callback) => {
+    try {
+      // Create new message
+      const newMessage = new Message({ 
+        senderUID, 
+        receiverUID, 
+        message,
+        isRead: false,
+        timestamp: new Date()
+      });
+      
+      await newMessage.save();
+      
+      // Create a unique chat room
+      const chatRoom = [senderUID, receiverUID].sort().join('_');
+      
+      // Emit to the specific chat room
+      io.to(chatRoom).emit("newMessage", newMessage);
+      
+      // Acknowledge successful message send
+      callback({ success: true, message: newMessage });
+      
+      console.log(`Message sent from ${senderUID} to ${receiverUID}`);
+    } catch (error) {
+      console.error("Error saving message:", error);
+      callback({ success: false, error: error.message });
+    }
+  });
   
   // Handle marking messages as read
   socket.on('markAsRead', async ({ userId, chatPartnerId }) => {
@@ -124,7 +162,34 @@ app.get("/get-unread-messages", async (req, res) => {
 });
 
 //---claude code
+// Add this route to your existing backend code
+app.post('/api/messages/mark-as-read', async (req, res) => {
+  const { userId, chatPartnerId } = req.body;
 
+  if (!userId || !chatPartnerId) {
+    return res.status(400).json({ error: 'User ID and Chat Partner ID are required' });
+  }
+
+  try {
+    // Update messages to mark as read
+    const result = await Message.updateMany(
+      { 
+        senderUID: chatPartnerId, 
+        receiverUID: userId, 
+        isRead: false 
+      },
+      { $set: { isRead: true } }
+    );
+
+    res.status(200).json({ 
+      message: 'Messages marked as read', 
+      modifiedCount: result.modifiedCount 
+    });
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 
 app.use('/uploads', express.static('uploads')); // Serve images from 'uploads' folder
@@ -259,45 +324,45 @@ app.get('/count-start-today', async (req, res) => {
 // server.js (Backend)
 app.get('/get-users', async (req, res) => {
   const { uid } = req.query; // Get UID from query params
-
+  
   if (!uid) {
     return res.status(400).send({ message: 'Missing UID in request' });
   }
-
+  
   try {
     // Get the current user's profile preferences
     const currentUser = await User.findOne({ uid });
     if (!currentUser) {
       return res.status(404).send({ message: 'User not found' });
     }
-
+    
     // Get the current date range (start and end of the day)
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-
+    
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
-
-    // Fetch users with profilePicUrl included
+    
+    // Fetch users with matching preferences on all criteria
     const users = await User.find(
       {
         clickedStartToday: true,
         dateJoined: { $gte: startOfDay, $lte: endOfDay },
         preferredLanguage: currentUser.preferredLanguage,
         preferredSolvingTime: currentUser.preferredSolvingTime,
+        dsaSheet: currentUser.dsaSheet,           // Added dsaSheet matching
+        dailyProblems: currentUser.dailyProblems, // Added dailyProblems matching
         uid: { $ne: uid }, // Exclude current user's UID
       },
-      'uid username profilePic' // Include profilePicUrl in response
+      'uid username profilePic' // Include profilePic in response
     );
-    
-
+        
     res.status(200).send({ message: 'Users fetched successfully', users });
   } catch (err) {
     console.error('Error fetching users:', err);
     res.status(500).send({ message: 'Error fetching users', error: err.message });
   }
 });
-
 // Route to fetch user data by UID
 app.get('/api/users/get-username', async (req, res) => {
   const { userUID } = req.query;
@@ -402,8 +467,8 @@ app.post('/api/messages/send-message', async (req, res) => {
     res.status(201).json({ message: 'Message sent successfully', savedMessage });
 
     // Emit the message to both sender and receiver
-    io.to(receiverUID).emit('newMessage', savedMessage);
-    io.to(senderUID).emit('messageSent', savedMessage);
+    const chatRoom = [senderUID, receiverUID].sort().join('_');
+    io.to(chatRoom).emit('newMessage', savedMessage);
   } catch (err) {
     console.error('Error sending message:', err);
     res.status(500).json({ message: 'Error sending message', error: err.message });
@@ -572,34 +637,49 @@ app.post('/api/messages/check-streak', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Step 1: Verify if the current user has a partner (check if partner field is not null)
+    // Step 1: Check if streak is already updated today
+    const today = moment().startOf('day');
+    const lastStreakUpdate = moment(userA.lastStreakUpdate);
+
+    console.log(today)
+    console.log(lastStreakUpdate)
+
+
+    if (lastStreakUpdate.isSame(today, 'day')) {
+      console.log("came inside")
+      return res.status(200).json({ 
+        streakCount: userA.streakCount,
+        alreadyUpdatedToday: true
+      });
+    }
+    console.log("nope again")
+    // Step 2: Verify partner exists
     if (!userA.partner) {
-      return res.status(400).json({ error: 'No partner assigned to the user' });
+      return res.status(400).json({ error: 'No partner assigned' });
     }
 
-    // Get the partner details
+    // Fetch partner details
     const userB = await User.findOne({ uid: userA.partner });
 
     if (!userB) {
-      return res.status(404).json({ error: 'Partner user not found' });
+      return res.status(404).json({ error: 'Partner not found' });
     }
 
-    // Step 2: Fetch submissions for both users
+    // Step 3: Fetch LeetCode submissions
     const fetchSubmissions = async (leetcodeProfileId) => {
       try {
         const response = await axios.get(`https://leetcode-api-faisalshohag.vercel.app/${leetcodeProfileId}`);
-        return response.data.recentSubmissions || []; // Assuming recent submissions is the key
+        return response.data.recentSubmissions || [];
       } catch (err) {
         console.error('Error fetching submissions:', err);
         return [];
       }
     };
 
-    // Fetch submissions for both users
     const submissionsA = await fetchSubmissions(userA.leetcodeProfileId);
     const submissionsB = await fetchSubmissions(userB.leetcodeProfileId);
 
-    // Step 3: Check the submissions for accepted solutions on the same day
+    // Step 4: Check for accepted solutions today
     const isSameDay = (timestamp) => moment.unix(timestamp).isSame(moment(), 'day');
 
     const acceptedA = submissionsA.find(submission =>
@@ -610,26 +690,29 @@ app.post('/api/messages/check-streak', async (req, res) => {
       isSameDay(submission.timestamp) && submission.statusDisplay === 'Accepted'
     );
 
-    // Step 4: Update streak count if both users solved a problem today
+    // Step 5: Update streak if both solved and not updated today
     if (acceptedA && acceptedB) {
-      // Both users have accepted submissions today, increase streak count
       userA.streakCount = (userA.streakCount || 0) + 1;
       userB.streakCount = (userB.streakCount || 0) + 1;
-
-      await userA.save();
-      await userB.save();
       
-      return res.status(200).json({ message: 'Streak updated for both users',streakCount:userA.streakCount });
-    } else {
-      // If one or both users did not submit an accepted solution today, reset streak count
-      userA.streakCount = 0;
-      userB.streakCount = 0;
+      userA.lastStreakUpdate = new Date();
+      userB.lastStreakUpdate = new Date();
 
       await userA.save();
       await userB.save();
 
-      return res.status(200).json({ message: 'Streak reset for both users',streakCount:userA.streakCount });
+      return res.status(200).json({ 
+        streakCount: userA.streakCount,
+        alreadyUpdatedToday: false
+      });
     }
+
+    // If no solutions or conditions not met
+    return res.status(200).json({ 
+      streakCount: userA.streakCount,
+      alreadyUpdatedToday: false
+    });
+
   } catch (error) {
     console.error('Error checking streak:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -1236,17 +1319,69 @@ app.patch("/api/dsa-problems/:title", async (req, res) => {  // Changed from :id
 
 
 
+// app.post('/create-profile', upload.single('profilePic'), async (req, res) => {
+//   const { uid, username, email, preferredLanguage, preferredSolvingTime,leetcodeProfileId } = req.body;
+//   console.log("username",username)
+//   console.log("username",leetcodeProfileId)
+//   if (!username || !uid || !email || !preferredLanguage || !preferredSolvingTime || !leetcodeProfileId || !req.file) {
+//     return res.status(400).json({ message: 'Missing required fields' });
+//   }
+
+//   try {
+//     const profilePicUrl = `${baseUrl}/uploads/${req.file.filename}`;
+  
+//     const newUser = new User({
+//       uid,
+//       username,
+//       email,
+//       preferredLanguage,
+//       preferredSolvingTime,
+//       profilePic: profilePicUrl,
+//       leetcodeProfileId,
+//     });
+//     //console.log(existingUser)
+//     //console.log("newuser:",newUser)
+    
+//     await newUser.save();
+//     res.status(200).json({ message: 'Profile created successfully', user: newUser });
+//   } catch (err) {
+//     console.error('Error creating profile:', err);
+//     res.status(500).json({ message: 'Error creating profile', error: err.message });
+//   }
+// });
+
+
+// Updated API endpoint (routes/user.routes.js)
 app.post('/create-profile', upload.single('profilePic'), async (req, res) => {
-  const { uid, username, email, preferredLanguage, preferredSolvingTime,leetcodeProfileId } = req.body;
-  console.log("username",username)
-  console.log("username",leetcodeProfileId)
+  const { 
+    uid, 
+    username, 
+    email, 
+    preferredLanguage, 
+    preferredSolvingTime, 
+    leetcodeProfileId,
+    dsaSheet,
+    dailyProblems,
+    codingGoal,
+    codingLevel,
+    codingSpeed,
+    solvePreference,
+    partnerPreference,
+    bio
+  } = req.body;
+  
+  console.log("username", username);
+  console.log("leetcodeProfileId", leetcodeProfileId);
+  
+  // Validate required fields
   if (!username || !uid || !email || !preferredLanguage || !preferredSolvingTime || !leetcodeProfileId || !req.file) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
-
+  
   try {
     const profilePicUrl = `${baseUrl}/uploads/${req.file.filename}`;
-  
+    
+    // Create new user with all the information
     const newUser = new User({
       uid,
       username,
@@ -1255,9 +1390,16 @@ app.post('/create-profile', upload.single('profilePic'), async (req, res) => {
       preferredSolvingTime,
       profilePic: profilePicUrl,
       leetcodeProfileId,
+      // New fields from the updated form
+      dsaSheet: dsaSheet || "",
+      dailyProblems: dailyProblems || "",
+      codingGoal: codingGoal || "",
+      codingLevel: codingLevel || "",
+      codingSpeed: codingSpeed || "",
+      solvePreference: solvePreference || "",
+      partnerPreference: partnerPreference || "",
+      bio: bio || ""
     });
-    //console.log(existingUser)
-    //console.log("newuser:",newUser)
     
     await newUser.save();
     res.status(200).json({ message: 'Profile created successfully', user: newUser });
@@ -1270,50 +1412,119 @@ app.post('/create-profile', upload.single('profilePic'), async (req, res) => {
 
 
 
-app.put('/update-profile', upload.single('profilePic'), async (req, res) => {
-  const { uid, username, preferredLanguage, preferredSolvingTime } = req.body;
+// app.put('/update-profile', upload.single('profilePic'), async (req, res) => {
+//   const { uid, username, preferredLanguage, preferredSolvingTime } = req.body;
 
+//   if (!uid || !username || !preferredLanguage || !preferredSolvingTime) {
+//     return res.status(400).json({ message: 'Missing required fields' });
+//   }
+
+//   try {
+//     const updatedFields = {
+//       username,
+//       preferredLanguage,
+//       preferredSolvingTime,
+//     };
+
+//     if (req.file) {
+//       const profilePicUrl = `${baseUrl}/uploads/${req.file.filename}`;
+//       updatedFields.profilePic = profilePicUrl;
+//     }
+
+//     const existingUser = await User.findOne({ uid });
+
+//     if (!existingUser) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
+
+//     // Update user profile with new values
+//     existingUser.username = username;
+//     existingUser.preferredLanguage = preferredLanguage;
+//     existingUser.preferredSolvingTime = preferredSolvingTime;
+
+//     // Only update profile picture if it's provided
+//     if (updatedFields.profilePic) {
+//       existingUser.profilePic = updatedFields.profilePic;
+//     }
+
+//     await existingUser.save();
+
+//     res.status(200).json({ message: 'Profile updated successfully', user: existingUser });
+//   } catch (err) {
+//     console.error('Error updating profile:', err);
+//     res.status(500).json({ message: 'Error updating profile', error: err.message });
+//   }
+// });
+
+app.put('/update-profile', upload.single('profilePic'), async (req, res) => {
+  const { 
+    uid, 
+    username, 
+    preferredLanguage, 
+    preferredSolvingTime,
+    dsaSheet,
+    dailyProblems,
+    codingGoal,
+    codingLevel,
+    solvingPreference,
+    partnerPreference,
+    bio
+  } = req.body;
+
+  // Check for required fields
   if (!uid || !username || !preferredLanguage || !preferredSolvingTime) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
   try {
+    // Build update object with all possible fields
     const updatedFields = {
       username,
       preferredLanguage,
       preferredSolvingTime,
     };
 
+    // Add optional fields if they exist
+    if (dsaSheet) updatedFields.dsaSheet = dsaSheet;
+    if (dailyProblems) updatedFields.dailyProblems = dailyProblems;
+    if (codingGoal) updatedFields.codingGoal = codingGoal;
+    if (codingLevel) updatedFields.codingLevel = codingLevel;
+    if (solvingPreference) updatedFields.solvingPreference = solvingPreference;
+    if (partnerPreference) updatedFields.partnerPreference = partnerPreference;
+    if (bio) updatedFields.bio = bio;
+
+    // Handle profile picture if uploaded
     if (req.file) {
       const profilePicUrl = `${baseUrl}/uploads/${req.file.filename}`;
       updatedFields.profilePic = profilePicUrl;
     }
 
+    // Find user by UID
     const existingUser = await User.findOne({ uid });
 
     if (!existingUser) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update user profile with new values
-    existingUser.username = username;
-    existingUser.preferredLanguage = preferredLanguage;
-    existingUser.preferredSolvingTime = preferredSolvingTime;
-
-    // Only update profile picture if it's provided
-    if (updatedFields.profilePic) {
-      existingUser.profilePic = updatedFields.profilePic;
-    }
+    // Update all fields from updatedFields object
+    Object.keys(updatedFields).forEach(key => {
+      existingUser[key] = updatedFields[key];
+    });
 
     await existingUser.save();
 
-    res.status(200).json({ message: 'Profile updated successfully', user: existingUser });
+    res.status(200).json({ 
+      message: 'Profile updated successfully', 
+      user: existingUser 
+    });
   } catch (err) {
     console.error('Error updating profile:', err);
-    res.status(500).json({ message: 'Error updating profile', error: err.message });
+    res.status(500).json({ 
+      message: 'Error updating profile', 
+      error: err.message 
+    });
   }
 });
-
 
 app.get('/user/:uid', async (req, res) => {
   const { uid } = req.params;
@@ -1328,7 +1539,7 @@ app.get('/user/:uid', async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
+    
     res.status(200).json(user);
   } catch (err) {
     console.error('Error fetching user data:', err);

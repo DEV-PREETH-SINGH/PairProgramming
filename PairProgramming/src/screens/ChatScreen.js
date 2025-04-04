@@ -10,29 +10,75 @@ const ChatScreen = ({ route, navigation }) => {
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [otherUserName, setOtherUserName] = useState('');
+  const [socket, setSocket] = useState(null);
 
   const currentUserUID = auth().currentUser?.uid;
   const { otherUserUID, userUID } = route.params;
   const extractedOtherUserUID = otherUserUID?.uid || otherUserUID || userUID;
   const chatContainerRef = useRef();
 
+  const [placeholder, setPlaceholder] = useState('Type a message...');
+  const placeholderCycleRef = useRef(null);
+
+    // Placeholder cycling effect
+    useEffect(() => {
+      const placeholderMessages = [
+        'Type a message...',
+        './send to send request',
+        './accepted to accept request',
+      ];
+      let currentIndex = 0;
+  
+      const cyclePlaceholder = () => {
+        currentIndex = (currentIndex + 1) % placeholderMessages.length;
+        setPlaceholder(placeholderMessages[currentIndex]);
+      };
+  
+      // Start placeholder cycling
+      placeholderCycleRef.current = setInterval(cyclePlaceholder, 3000);
+  
+      // Clean up interval on component unmount
+      return () => {
+        if (placeholderCycleRef.current) {
+          clearInterval(placeholderCycleRef.current);
+        }
+      };
+    }, []);
+
   // Establish WebSocket connection
   useEffect(() => {
-    const socket = io(baseUrl); // Connect to the WebSocket server
+    // Create socket connection
+    const newSocket = io(baseUrl);
+    setSocket(newSocket);
 
-    socket.on('newMessage', (newMessage) => {
-      // When a new message is received via WebSocket
-      if (newMessage.senderUID === extractedOtherUserUID || newMessage.receiverUID === extractedOtherUserUID) {
-        setMessages((prevMessages) => [...prevMessages, newMessage]);
+    // Join a room specific to this chat
+    newSocket.emit('joinChat', { 
+      user1: currentUserUID, 
+      user2: extractedOtherUserUID 
+    });
+
+    // Listen for new messages
+    newSocket.on('newMessage', (newMessage) => {
+      // Only add message if it's related to current chat
+      if (
+        (newMessage.senderUID === extractedOtherUserUID && newMessage.receiverUID === currentUserUID) ||
+        (newMessage.senderUID === currentUserUID && newMessage.receiverUID === extractedOtherUserUID)
+      ) {
+        setMessages((prevMessages) => {
+          // Avoid duplicates
+          const isDuplicate = prevMessages.some(msg => msg._id === newMessage._id);
+          return isDuplicate ? prevMessages : [...prevMessages, newMessage];
+        });
       }
     });
 
     // Clean up the WebSocket connection when component unmounts
     return () => {
-      socket.disconnect();
+      newSocket.disconnect();
     };
-  }, [extractedOtherUserUID]);
+  }, [currentUserUID, extractedOtherUserUID]);
 
+  // Fetch other user's name
   useEffect(() => {
     const fetchOtherUserName = async () => {
       try {
@@ -48,6 +94,7 @@ const ChatScreen = ({ route, navigation }) => {
     fetchOtherUserName();
   }, [extractedOtherUserUID]);
 
+  // Fetch existing messages
   useEffect(() => {
     const fetchMessages = async () => {
       try {
@@ -73,79 +120,37 @@ const ChatScreen = ({ route, navigation }) => {
     fetchMessages();
   }, [currentUserUID, extractedOtherUserUID]);
 
-  // const handleSendMessage = async () => {
-  //   if (messageText.trim() === '') return;
-
-  //   const tempMessage = {
-  //     _id: new Date().toISOString(),
-  //     senderUID: currentUserUID,
-  //     receiverUID: extractedOtherUserUID,
-  //     message: messageText,
-  //     timestamp: new Date().toISOString(),
-  //     isTemp: true,
-  //   };
-
-  //   setMessages((prevMessages) => [...prevMessages, tempMessage]);
-  //   setMessageText('');
-
-  //   try {
-  //     const response = await axios.post(`${baseUrl}/api/messages/send-message`, {
-  //       senderUID: currentUserUID,
-  //       receiverUID: extractedOtherUserUID,
-  //       message: messageText,
-  //     });
-
-  //     if (response.status === 201) {
-  //       // Emit via WebSocket for real-time updates
-  //       const socket = io(baseUrl);
-  //       socket.emit('sendMessage', response.data.savedMessage);
-  //     } else {
-  //       throw new Error('Failed to send message');
-  //     }
-  //   } catch (err) {
-  //     console.error('Error sending message:', err);
-  //     setMessages((prevMessages) =>
-  //       prevMessages.map((msg) =>
-  //         msg.isTemp && msg._id === tempMessage._id
-  //           ? { ...msg, error: 'Failed to send' }
-  //           : msg
-  //       )
-  //     );
-  //   }
-  // };
-
-  const handleSendMessage = async () => {
+  const handleSendMessage = () => {
     if (messageText.trim() === '') return;
-  
-    // Check if the message is a special command
+
+    // Check for special commands
     if (messageText.trim() === './send' || messageText.trim() === './accepted') {
       try {
-        console.log("send")
         const apiUrl = messageText.trim() === './send' 
           ? `${baseUrl}/api/messages/send-special`
           : `${baseUrl}/api/messages/accepted`;
-  
-        const response = await axios.post(apiUrl, {
+
+        axios.post(apiUrl, {
           senderUID: currentUserUID,
           receiverUID: extractedOtherUserUID,
+        }).then(response => {
+          if (response.status === 201) {
+            console.log('API call successful:', response.data);
+          }
+        }).catch(err => {
+          console.error('Error making API call:', err);
         });
-  
-        if (response.status === 201) {
-          // Handle the successful response if necessary
-          console.log('API call successful:', response.data);
-        } else {
-          throw new Error('API call failed');
-        }
+
+        setMessageText('');
+        return;
       } catch (err) {
-        console.error('Error making API call:', err);
+        console.error('Error with special command:', err);
+        return;
       }
-      // Don't send the message as a chat message
-      setMessageText('');
-      return;
     }
-  
-    // For normal messages, proceed with sending the message
-    const tempMessage = {
+
+    // Prepare message object
+    const newMessage = {
       _id: new Date().toISOString(),
       senderUID: currentUserUID,
       receiverUID: extractedOtherUserUID,
@@ -153,36 +158,31 @@ const ChatScreen = ({ route, navigation }) => {
       timestamp: new Date().toISOString(),
       isTemp: true,
     };
-  
-    setMessages((prevMessages) => [...prevMessages, tempMessage]);
+
+    // Optimistically add message to UI
+    // setMessages((prevMessages) => [...prevMessages, newMessage]);
     setMessageText('');
-  
-    try {
-      const response = await axios.post(`${baseUrl}/api/messages/send-message`, {
+
+    // Send message via socket
+    if (socket) {
+      socket.emit('sendMessage', {
         senderUID: currentUserUID,
         receiverUID: extractedOtherUserUID,
         message: messageText,
+      }, (response) => {
+        if (response?.error) {
+          // Handle send error
+          setMessages((prevMessages) =>
+            prevMessages.map((msg) =>
+              msg.isTemp && msg._id === newMessage._id
+                ? { ...msg, error: 'Failed to send' }
+                : msg
+            )
+          );
+        }
       });
-  
-      if (response.status === 201) {
-        // Emit via WebSocket for real-time updates
-        const socket = io(baseUrl);
-        socket.emit('sendMessage', response.data.savedMessage);
-      } else {
-        throw new Error('Failed to send message');
-      }
-    } catch (err) {
-      console.error('Error sending message:', err);
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) =>
-          msg.isTemp && msg._id === tempMessage._id
-            ? { ...msg, error: 'Failed to send' }
-            : msg
-        )
-      );
     }
   };
-  
 
   const RenderMessageItem = React.memo(({ item }) => {
     return (
@@ -193,6 +193,7 @@ const ChatScreen = ({ route, navigation }) => {
         ]}
       >
         <Text style={styles.messageText}>{item.message}</Text>
+        {item.error && <Text style={styles.errorText}>{item.error}</Text>}
       </View>
     );
   });
@@ -225,7 +226,9 @@ const ChatScreen = ({ route, navigation }) => {
           style={styles.input}
           value={messageText}
           onChangeText={setMessageText}
-          placeholder="Type a message..."
+          placeholder={placeholder}
+          placeholderTextColor="#888"
+
         />
         <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
           <Send size={24} color="#949494" />
@@ -235,13 +238,11 @@ const ChatScreen = ({ route, navigation }) => {
   );
 };
 
-
 const styles = StyleSheet.create({
   container: {
     backgroundColor:'white',
     flex: 1,
     justifyContent: 'flex-end',
-    // padding: 20,
   },
   topBar: {
     padding:20,
@@ -252,13 +253,12 @@ const styles = StyleSheet.create({
     marginBottom:20,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
-    
   },
   renderingMessageBox:{
     padding:10,
   },
   chatHeader: {
-  fontSize: 22,
+    fontSize: 22,
     fontWeight: 'bold',
     marginLeft: 10,
     paddingRight:50,
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 10,
     maxWidth: '80%',
-    backgroundColor: 'grey', // Updated to grey background
+    backgroundColor: 'grey',
   },
   sentMessage: {
     alignSelf: 'flex-end',
@@ -283,6 +283,11 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 16,
   },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginTop: 5,
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -293,11 +298,11 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderWidth: 1,
     borderRadius: 5,
-    flex: 0.8, // Takes up 80% of the width
+    flex: 0.8,
     paddingLeft: 10,
   },
   sendButton: {
-    flex: 0.2, // Takes up 20% of the width
+    flex: 0.2,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 10,

@@ -13,7 +13,9 @@ import { ProgressBar } from 'react-native-paper';
 
 const Tab = createBottomTabNavigator();
 const windowWidth = Dimensions.get("window").width;
+//npx react-native start --reset-cache
 
+//npx react-native run-android
 // Custom circular progress component
 const CircularProgress = ({ percentage, size, strokeWidth, text, color = "#AD7BFF" }) => {
   const radius = (size - strokeWidth) / 2;

@@ -123,6 +123,19 @@ const ChatScreen = ({ route, navigation }) => {
   const handleSendMessage = () => {
     if (messageText.trim() === '') return;
 
+    // Create message object for both regular and special messages
+    const newMessage = {
+      _id: new Date().toISOString(),
+      senderUID: currentUserUID,
+      receiverUID: extractedOtherUserUID,
+      message: messageText,
+      timestamp: new Date().toISOString(),
+      isTemp: true,
+    };
+
+    // Add the message to UI immediately for all message types
+    // setMessages((prevMessages) => [...prevMessages, newMessage]);
+
     // Check for special commands
     if (messageText.trim() === './send' || messageText.trim() === './accepted') {
       try {
@@ -133,12 +146,39 @@ const ChatScreen = ({ route, navigation }) => {
         axios.post(apiUrl, {
           senderUID: currentUserUID,
           receiverUID: extractedOtherUserUID,
-        }).then(response => {
+          message: messageText, // Also send the message text to store in database
+        })
+        .then(response => {
           if (response.status === 201) {
             console.log('API call successful:', response.data);
+            // Update the temp message to remove isTemp flag if needed
+            setMessages((prevMessages) =>
+              prevMessages.map((msg) =>
+                msg.isTemp && msg._id === newMessage._id
+                  ? { ...msg, isTemp: false }
+                  : msg
+              )
+            );
+
+          //   if (socket) {
+          //   socket.emit('sendMessage', {
+          //     senderUID: currentUserUID,
+          //     receiverUID: extractedOtherUserUID,
+          //     message: messageText,
+          //   });
+          // }
           }
-        }).catch(err => {
+        })
+        .catch(err => {
           console.error('Error making API call:', err);
+          // Mark message with error
+          setMessages((prevMessages) =>
+            prevMessages.map((msg) =>
+              msg.isTemp && msg._id === newMessage._id
+                ? { ...msg, error: 'Failed to send' }
+                : msg
+            )
+          );
         });
 
         setMessageText('');
@@ -149,21 +189,10 @@ const ChatScreen = ({ route, navigation }) => {
       }
     }
 
-    // Prepare message object
-    const newMessage = {
-      _id: new Date().toISOString(),
-      senderUID: currentUserUID,
-      receiverUID: extractedOtherUserUID,
-      message: messageText,
-      timestamp: new Date().toISOString(),
-      isTemp: true,
-    };
-
-    // Optimistically add message to UI
-    // setMessages((prevMessages) => [...prevMessages, newMessage]);
+    // Reset the input field
     setMessageText('');
 
-    // Send message via socket
+    // Send regular message via socket
     if (socket) {
       socket.emit('sendMessage', {
         senderUID: currentUserUID,
@@ -184,28 +213,48 @@ const ChatScreen = ({ route, navigation }) => {
     }
   };
 
+  // const RenderMessageItem = React.memo(({ item }) => {
+  //   return (
+  //     <View
+  //       style={[
+  //         styles.messageItem,
+  //         item.senderUID === currentUserUID ? styles.sentMessage : styles.receivedMessage,
+  //       ]}
+  //     >
+  //       <Text style={styles.messageText}>{item.message}</Text>
+  //       {item.error && <Text style={styles.errorText}>{item.error}</Text>}
+  //     </View>
+  //   );
+  // });
+
   const RenderMessageItem = React.memo(({ item }) => {
+    // Check if it's a special message
+    const isSpecialMessage = item.message === './send' || item.message === './accepted';
+  
     return (
       <View
         style={[
           styles.messageItem,
           item.senderUID === currentUserUID ? styles.sentMessage : styles.receivedMessage,
+          isSpecialMessage && styles.specialMessage, // Apply special message style
         ]}
       >
-        <Text style={styles.messageText}>{item.message}</Text>
+        <Text style={[styles.messageText, isSpecialMessage && styles.specialMessageText]}>
+          {item.message}
+        </Text>
         {item.error && <Text style={styles.errorText}>{item.error}</Text>}
       </View>
     );
   });
-
+  
   return (
     <View style={styles.container}>
       {/* Top Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <ChevronLeft size={30} color="#aaa" />
+          <ChevronLeft size={30} color="white" />
         </TouchableOpacity>
-        <Text style={styles.chatHeader}>Chat with {otherUserName}</Text>
+        <Text style={styles.chatHeader}>{otherUserName}</Text>
       </View>
 
       {/* Message list */}
@@ -240,16 +289,23 @@ const ChatScreen = ({ route, navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor:'white',
+    backgroundColor:'#faf6fe',
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  specialMessage: {
+    backgroundColor: '#8b4ad3', // Light background color for special messages
+  },
+  specialMessageText: {
+    color: 'white', // Red font color for special messages
+    fontWeight: 'bold', // Optionally make the text bold for special messages
   },
   topBar: {
     padding:20,
     flexDirection: 'row',
     alignItems: 'center',
     paddingBottom:15,
-    backgroundColor: 'white',
+    backgroundColor: '#8b4ad3',
     marginBottom:20,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
@@ -264,21 +320,22 @@ const styles = StyleSheet.create({
     paddingRight:50,
     flex: 1,
     textAlign: 'center',
+    color:'white'
   },
   messageItem: {
     padding: 10,
     marginBottom: 10,
     borderRadius: 10,
     maxWidth: '80%',
-    backgroundColor: 'grey',
+    backgroundColor: '#d5bdf5',
   },
   sentMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#d6d6d6',
+    backgroundColor: '#d5bdf5',
   },
   receivedMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#d6d6d6',
+    backgroundColor: '#d5bdf5',
   },
   messageText: {
     fontSize: 16,

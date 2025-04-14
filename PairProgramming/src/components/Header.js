@@ -25,16 +25,17 @@ const Header = ({ uid }) => {
   }, [uid]);
 
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, backgroundColor: "#f0f7ff" }}>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, backgroundColor: "white" }}>
       {/* Left section with "Hello" and username on separate lines */}
       <View style={{ flexDirection: 'column' }}>
-        <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
-          Hello
-        </Text>
-        <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
-          {userData?.username || 'User'}.
-        </Text>
-      </View>
+  <Text style={{ fontFamily: 'Source Code Pro Italic', fontSize: 18, fontWeight: 'bold', color: 'black' }}>
+    Hello
+  </Text>
+  <Text style={{ fontFamily: 'Source Code Pro Italic', fontSize: 18, fontWeight: 'bold', color: 'black' }}>
+    {userData?.username || 'User'}.
+  </Text>
+</View>
+
   
       {/* Profile picture on the right */}
       <TouchableOpacity onPress={() => navigation.navigate('ProfileEditScreen')}>

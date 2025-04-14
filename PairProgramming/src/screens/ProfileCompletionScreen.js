@@ -176,30 +176,35 @@ const ProfileCompletionScreen = () => {
     }
   };
 
-  // Render the progress indicator
-  const renderProgressBar = () => (
-    <View style={styles.progressContainer}>
-      {[1, 2, 3, 4].map((step) => (
-        <View key={step} style={styles.progressRow}>
-          <View 
-            style={[
-              styles.progressDot, 
-              currentStep >= step ? styles.activeDot : styles.inactiveDot
-            ]} 
-          />
-          <Text style={[
-            styles.progressText, 
-            currentStep >= step ? styles.activeText : styles.inactiveText
-          ]}>
-            {step === 1 && "Personal Info"}
-            {step === 2 && "Goals & Skills"}
-            {step === 3 && "Matching"}
-            {step === 4 && "Bio & Finish"}
-          </Text>
+  // Render the progress bar
+  const renderProgressBar = () => {
+    const totalSteps = 4;
+    const progressWidth = (currentStep / totalSteps) * 100;
+    
+    return (
+      <View style={styles.progressBarContainer}>
+        <View style={styles.progressLabels}>
+          {[1, 2, 3, 4].map((step) => (
+            <Text 
+              key={step} 
+              style={[
+                styles.progressLabel, 
+                currentStep >= step ? styles.activeLabel : styles.inactiveLabel
+              ]}
+            >
+              {step === 1 && "Personal Info"}
+              {step === 2 && "Goals & Skills"}
+              {step === 3 && "Matching"}
+              {step === 4 && "Bio & Finish"}
+            </Text>
+          ))}
         </View>
-      ))}
-    </View>
-  );
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progressWidth}%` }]} />
+        </View>
+      </View>
+    );
+  };
 
   // Render form steps
   const renderStep = () => {
@@ -218,9 +223,7 @@ const ProfileCompletionScreen = () => {
             />
 
             <Text style={styles.questionText}>What's your coding language of choice?</Text>
-            <Text style={styles.subText}>
-              Select your primary programming language (Choose wisely! This will help match you with the right coding buddies)
-            </Text>
+           
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={preferredLanguage}
@@ -247,9 +250,7 @@ const ProfileCompletionScreen = () => {
             )}
 
             <Text style={styles.questionText}>When do you typically code?</Text>
-            <Text style={styles.subText}>
-              Select your preferred coding time – are you an early bird or a night owl?
-            </Text>
+            
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={preferredSolvingTime}
@@ -266,9 +267,7 @@ const ProfileCompletionScreen = () => {
             </View>
 
             <Text style={styles.questionText}>Which DSA sheet are you currently working on?</Text>
-            <Text style={styles.subText}>
-              Do you follow any DSA guide? Pick the one that best matches your current goals.
-            </Text>
+            
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={dsaSheet}
@@ -279,9 +278,8 @@ const ProfileCompletionScreen = () => {
                 <Picker.Item label="Blind75 🏆" value="Blind75" />
                 <Picker.Item label="NeetCode 📜" value="NeetCode" />
                 <Picker.Item label="Striver's Guide 🚀" value="Striver's Guide" />
+                <Picker.Item label="LeetCode Top 100" value="LeetCode Top 100" />
                 <Picker.Item label="My Own Path 🛤️" value="My Own Path" />
-                <Picker.Item label="None 🤷‍♂️" value="None" />
-                <Picker.Item label="Other" value="Other" />
               </Picker>
             </View>
             
@@ -296,9 +294,7 @@ const ProfileCompletionScreen = () => {
             )}
 
             <Text style={styles.questionText}>How many problems do you want to solve each day?</Text>
-            <Text style={styles.subText}>
-              Set a daily challenge! How many problems do you plan to tackle every day?
-            </Text>
+            
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={dailyProblems}
@@ -334,9 +330,7 @@ const ProfileCompletionScreen = () => {
             <Text style={styles.stepTitle}>Step 2: Your Goals & Preferences</Text>
             
             <Text style={styles.questionText}>What's your ultimate coding goal?</Text>
-            <Text style={styles.subText}>
-              What's the big picture? Are you aiming for interviews, competitions, or mastering DSA? Choose your main goal.
-            </Text>
+            
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={codingGoal}
@@ -353,9 +347,7 @@ const ProfileCompletionScreen = () => {
             </View>
 
             <Text style={styles.questionText}>What's your current coding level?</Text>
-            <Text style={styles.subText}>
-              How do you rate your coding skills? Let's find a match based on your level.
-            </Text>
+            
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={codingLevel}
@@ -370,9 +362,7 @@ const ProfileCompletionScreen = () => {
             </View>
 
             <Text style={styles.questionText}>What's your preferred coding speed?</Text>
-            <Text style={styles.subText}>
-              How fast do you like to solve problems? Are you a speedster or a deep thinker?
-            </Text>
+            
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={codingSpeed}
@@ -508,26 +498,23 @@ const ProfileCompletionScreen = () => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
+      {renderProgressBar()}
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.header}>Complete Your Profile</Text>
-        
-        {renderProgressBar()}
         {renderStep()}
         {renderButtons()}
       </ScrollView>
     </KeyboardAvoidingView>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f7f7f7',
+    backgroundColor: "#f0f7ff",
   },
   scrollView: {
     flex: 1,
@@ -535,58 +522,43 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingBottom: 40,
-  },
-  header: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
-    textAlign: 'center',
+    paddingTop: 10,
   },
   // Progress bar
-  progressContainer: {
+  progressBarContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
+  progressLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 25,
-    paddingHorizontal: 10,
+    marginBottom: 8,
   },
-  progressRow: {
-    alignItems: 'center',
-  },
-  progressDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    marginBottom: 5,
-  },
-  activeDot: {
-    backgroundColor: '#000000',
-  },
-  inactiveDot: {
-    backgroundColor: '#cccccc',
-  },
-  progressText: {
+  progressLabel: {
     fontSize: 12,
     textAlign: 'center',
   },
-  activeText: {
+  activeLabel: {
     color: '#000000',
     fontWeight: 'bold',
   },
-  inactiveText: {
+  inactiveLabel: {
     color: '#888888',
   },
-  // Step container
+  progressTrack: {
+    height: 5,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#000000',
+  },
+  // Step container - now blending with background
   stepContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingBottom: 20,
   },
   stepTitle: {
     fontSize: 18,
@@ -599,11 +571,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginTop: 15,
-    marginBottom: 5,
-  },
-  subText: {
-    fontSize: 14,
-    color: '#666',
     marginBottom: 10,
   },
   // Form elements

@@ -63,7 +63,8 @@ const ProfileEditScreen = ({ navigation }) => {
           dsaSheet, 
           dailyProblems, 
           codingGoal, 
-          codingLevel, 
+          codingLevel,
+          codingSpeed, 
           solvePreference, 
           partnerPreference, 
           bio 
@@ -80,6 +81,7 @@ const ProfileEditScreen = ({ navigation }) => {
           dailyProblems: dailyProblems || 0, // Default to 0 if not provided
           codingGoal: codingGoal || '',
           codingLevel: codingLevel || '',
+          codingSpeed: codingSpeed || '',
           solvePreference: solvePreference || '',
           partnerPreference: partnerPreference || '',
           bio: bio || '' // Default empty string if no bio
@@ -132,7 +134,7 @@ const ProfileEditScreen = ({ navigation }) => {
       formData.append('codingGoal', profileData.codingGoal);
       formData.append('codingLevel', profileData.codingLevel);
       formData.append('codingSpeed', profileData.codingSpeed);
-      formData.append('solvePreference', profileData.solvingPreference);
+      formData.append('solvePreference', profileData.solvePreference);
       formData.append('partnerPreference', profileData.partnerPreference);
       formData.append('bio', profileData.bio);
 
@@ -251,9 +253,9 @@ const ProfileEditScreen = ({ navigation }) => {
                 <Picker.Item label="Select a DSA sheet" value="" />
                 <Picker.Item label="Blind75" value="Blind75" />
                 <Picker.Item label="NeetCode" value="NeetCode" />
-                <Picker.Item label="Striver SDE Sheet" value="Striver SDE Sheet" />
+                <Picker.Item label="Striver SDE Sheet" value="Striver's Guide" />
                 <Picker.Item label="LeetCode Top 100" value="LeetCode Top 100" />
-                <Picker.Item label="Custom" value="Custom" />
+                <Picker.Item label="My Own Path" value="My Own Path" />
               </Picker>
             </View>
             
@@ -300,7 +302,7 @@ const ProfileEditScreen = ({ navigation }) => {
                 <Picker.Item label="Competitive Programming" value="Competitive Programming" />
                 <Picker.Item label="DSA mastery" value="DSA mastery" />
                 <Picker.Item label="Coding for fun" value="Coding for fun" />
-                <Picker.Item label="Other" value="Other" />
+                <Picker.Item label="Just here to learn!" value="Just learning" />
               </Picker>
             </View>
             
@@ -357,9 +359,9 @@ const ProfileEditScreen = ({ navigation }) => {
                 onValueChange={(value) => setProfileData(prev => ({...prev, solvePreference: value}))}
               >
                 <Picker.Item label="Select your preference" value="" />
-                <Picker.Item label="Real-Time Together" value="Real-Time Together" />
-                <Picker.Item label="Separate & Discuss Later" value="Separate & Discuss Later" />
-                <Picker.Item label="Either Way" value="Either Way" />
+                <Picker.Item label="Real-Time Together" value="Real-time" />
+                <Picker.Item label="Separate & Discuss Later" value="Separately" />
+                <Picker.Item label="Either Way" value="Either" />
               </Picker>
             </View>
             
@@ -369,6 +371,7 @@ const ProfileEditScreen = ({ navigation }) => {
                 selectedValue={profileData.partnerPreference}
                 style={styles.picker}
                 onValueChange={(value) => setProfileData(prev => ({...prev, partnerPreference: value}))}
+                
               >
                 <Picker.Item label="Select your expectation" value="" />
                 <Picker.Item label="Support & Motivation" value="Support & Motivation" />
@@ -528,7 +531,7 @@ const ProfileEditScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: "#f6f8fa",
+    backgroundColor: "#f0f7ff",
   },
   topBar: {
     flexDirection: 'row',
@@ -536,9 +539,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingTop: 15,
     paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eaeaea',
-    backgroundColor: '#fff',
+    // borderBottomWidth: 1,
+    // borderBottomColor: '#eaeaea',
+    backgroundColor: "#f0f7ff",
   },
   backButton: {
     padding: 5,
@@ -593,8 +596,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 8,
     marginBottom: 10,
-    elevation: 1,
-    shadowColor: '#000',
+    // elevation: 1,
+    // shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,

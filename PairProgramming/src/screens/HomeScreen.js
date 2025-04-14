@@ -10,6 +10,7 @@ import { baseUrl } from "@env";
 import UserListScreen from "./UserListScreen";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
 import { ProgressBar } from 'react-native-paper';
+import LinearGradient from "react-native-linear-gradient";
 
 const Tab = createBottomTabNavigator();
 const windowWidth = Dimensions.get("window").width;
@@ -30,7 +31,7 @@ const CircularProgress = ({ percentage, size, strokeWidth, text, color = "#AD7BF
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#E6E6E6"
+          stroke="#f2ebfc"
           strokeWidth={strokeWidth}
           fill="transparent"
         />
@@ -40,7 +41,7 @@ const CircularProgress = ({ percentage, size, strokeWidth, text, color = "#AD7BF
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={color}
+          stroke="#8b4ad3"
           strokeWidth={strokeWidth}
           fill="transparent"
           strokeDasharray={circumference}
@@ -139,6 +140,8 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const HomeContent = () => (
+    // <LinearGradient colors={["#E8CBC0", "#9398AE"]} style={styles.scrollView}>
+
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContainer}>
       <View style={styles.container}>
         
@@ -150,11 +153,15 @@ const HomeScreen = ({ navigation }) => {
             <View style={styles.topRowContainer}>
               {/* LeetCode Stats Card */}
               <View style={styles.leftColumn}>
-                <View style={styles.statsCard}>
+                {/* <View style={styles.statsCard}> */}
+                <LinearGradient
+      colors={['#8b4ad3', '#bc93ed']}  // Gradient colors
+      style={styles.statsCard}
+    >
                   <Text style={styles.cardTitle}>Leetcode</Text>
                   <View style={styles.statRow}>
                     <Text style={styles.statLabel}>Total Submissions:</Text>
-                    <Text style={styles.statValue}>{leetcodeProgress.totalSubmissions?.length || 0}</Text>
+                    <Text style={styles.statValue}>{leetcodeProgress.totalSubmissions[0].submissions || 0}</Text>
                   </View>
                   <View style={styles.statRow}>
                     <Text style={styles.statLabel}>Ranking:</Text>
@@ -168,7 +175,7 @@ const HomeScreen = ({ navigation }) => {
                     <Text style={styles.statLabel}>Reputation:</Text>
                     <Text style={styles.statValue}>{leetcodeProgress.reputation || 0}</Text>
                   </View>
-                </View>
+                  </LinearGradient>
               </View>
               
               {/* Overall Progress Circle */}
@@ -200,24 +207,29 @@ const HomeScreen = ({ navigation }) => {
                         },
                       ],
                     }}
-                    width={windowWidth - 40}
+                    width={windowWidth - 50}
                     height={160}
                     chartConfig={{
                       backgroundColor: "transparent",
-                      backgroundGradientFrom: "#fff",
-                      backgroundGradientTo: "#fff",
+                      backgroundGradientFrom: "#white",
+                      backgroundGradientTo: "white",
                       decimalPlaces: 0,
-                      color: (opacity = 1) => `rgba(255, 204, 0, ${opacity})`,
+                      // color: (opacity = 1) => `rgba(255, 204, 0, ${opacity})`,
+                      color: (opacity = 1) => `rgba(188, 147, 237, ${opacity})`,
+
+
+                      // labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
                       labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+
                       style: {
                         borderRadius: 16,
                       },
                       propsForDots: {
                         r: "3",
                         strokeWidth: "1",
-                        stroke: "#ffa726",
+                        stroke: "#8b4ad3",
                       },
-                      fillShadowGradient: "rgba(255, 204, 0, 1)",
+                      fillShadowGradient: "rgb(255, 255, 255)",
                       fillShadowGradientOpacity: 0.6,
                     }}
                     bezier
@@ -297,52 +309,58 @@ const HomeScreen = ({ navigation }) => {
         )}
       </View>
     </ScrollView>
+    // </LinearGradient>
+
   );
 
   return (
-    <Tab.Navigator
-      screenOptions={{
-        tabBarStyle: styles.tabBar,
-        tabBarShowLabel: false,
-        // borderTopWidth: 0, // Removes the top line
-        // elevation: 0, // Removes shadow on Android
-      }}
-    >
-      <Tab.Screen
-        name="Home"
-        component={HomeContent}
-        options={{
-          tabBarIcon: ({ color, size }) => <House size={20} color="#000" />,
-          headerShown: false,
+    <View style={{ flex: 1, backgroundColor: "white" }}>
+      <Tab.Navigator
+        initialRouteName="Home"  // Ensures Home screen is shown first after login
+        screenOptions={{
+          tabBarStyle: styles.tabBar,
+          tabBarShowLabel: false,
+          // borderTopWidth: 0, // Removes the top line
+          // elevation: 0, // Removes shadow on Android
         }}
-      />
-
-      {/* Other Tab Screens */}
-      <Tab.Screen
-        name="UserList"
-        component={UserListScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <UserRoundPen size={20} color="#000" />,
-          headerShown: false,
-        }}
-      />
-
-      <Tab.Screen
-        name="Chats"
-        component={ChatListScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <MessageCircle size={20} color="#000" />,
-          headerShown: false,
-        }}
-      />
-    </Tab.Navigator>
+      >
+        {/* Reordered Tab Screens */}
+        <Tab.Screen
+          name="UserList"
+          component={UserListScreen}
+          options={{
+            tabBarIcon: ({ color, size }) => <UserRoundPen size={20} color="white" />,
+            headerShown: false,
+          }}
+        />
+  
+        <Tab.Screen
+          name="Home"
+          component={HomeContent}
+          options={{
+            tabBarIcon: ({ color, size }) => <House size={20} color="white" />,
+            headerShown: false,
+          }}
+        />
+  
+        <Tab.Screen
+          name="Chats"
+          component={ChatListScreen}
+          options={{
+            tabBarIcon: ({ color, size }) => <MessageCircle size={20} color="white" />,
+            headerShown: false,
+          }}
+        />
+      </Tab.Navigator>
+    </View>
   );
+  
 };
 
 const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
-    backgroundColor: "#f0f7ff",
+    backgroundColor: "white",
   },
   scrollContainer: {
     paddingBottom: 10,
@@ -374,7 +392,7 @@ const styles = StyleSheet.create({
   },
   // Stats card styling
   statsCard: {
-    backgroundColor: "#989AAD",
+    backgroundColor: "#8b4ad3",
     borderRadius: 12,
     padding: 10,
     // shadowColor: "#000",
@@ -413,16 +431,19 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: "#333",
   },
-  chartContainer: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 0,
-    // shadowColor: "#000",
-    // shadowOffset: { width: 0, height: 2 },
-    // shadowOpacity: 0.1,
-    // shadowRadius: 6,
-    // elevation: 4,
-  },
+chartContainer: {
+  backgroundColor: "white",
+  borderRadius: 16,
+  padding: 0,
+  borderWidth: 1,               // Thin border
+  borderColor: "#d3d3d3",       // Light grey color
+  // shadowColor: "#000",          // Shadow color
+  // shadowOffset: { width: 0, height: 3 }, // Shadow only at the bottom
+  // shadowOpacity: 0.08,          // Light shadow effect
+  // shadowRadius: 4,              // Slight blur
+  // elevation: 3,                 // Elevation for Android shadow effect
+},
+
   chart: {
     marginVertical: 8,
     borderRadius: 8,
@@ -434,6 +455,7 @@ const styles = StyleSheet.create({
   },
   // Circular progress common styles
   circularProgressContainer: {
+    
     alignItems: "center",
     justifyContent: "center",
   },
@@ -450,15 +472,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 10,
   },
-  // Tab navigation styling
-  tabBar: {
-    backgroundColor: "#f0f7ff",
-     borderTopWidth: 0,
-     elevation: 0,
-     borderTopColor: "#e0e0e0",
-    height: 60,
-    paddingBottom: 5,
-  },
+// Tab navigation styling
+tabBar: {
+  backgroundColor: "#8b4ad3",  // Background color of the tab bar
+  borderTopLeftRadius: 30,     // Curved left corner
+  borderTopRightRadius: 30,    // Curved right corner
+  height: 60,                  // Height of the tab bar
+  paddingBottom: 5,            // Padding at the bottom
+  overflow: 'hidden',          // Ensures content doesn't overflow beyond the curved corners
+  elevation: 0,                // No elevation for shadow
+},
+
   // Add these to your existing styles object
 // Add these to your existing styles object
 bottomRow: {

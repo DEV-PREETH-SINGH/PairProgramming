@@ -167,7 +167,7 @@ const ChatListScreen = () => {
     return (
       <View style={styles.noChatContainer}>
         <Image
-          source={require('../assets/StartConversation.jpg')}
+          source={require('../assets/CONVERSATION.png')}
           style={styles.emptyImage}
         />
         <Text style={styles.noChatText}>No chats yet? Say hi to someone!</Text>
@@ -200,7 +200,7 @@ const ChatListScreen = () => {
 
             <View style={styles.messageContainer}>
               {unreadMessages[item._id] && <View style={styles.unreadDot} />}
-              <MessageCircle size={24} color="#555" style={styles.icon} />
+              <MessageCircle size={24} color="white" style={styles.icon} />
             </View>
           </TouchableOpacity>
         )}
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: "#f0f7ff",
+    backgroundColor: "white",
   },
   loadingText: {
     fontSize: 16,
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   userItem: {
     flexDirection: 'row', 
     padding: 16,
-    backgroundColor: "#0099cc57",
+    backgroundColor: "#8b4ad3",
     borderRadius: 12,
     marginBottom: 10,
     shadowColor: '#000',
@@ -251,19 +251,20 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '600',
+    color:'white',
   },
   partnerLabel: {
     marginLeft: 8,
     fontSize: 12,
-    color: '#4CAF50',
-    backgroundColor: '#E8F5E9',
+    color: 'white',
+    backgroundColor: '#d5bdf5',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
   streakText: {
     fontSize: 13,
-    color: '#FF9800',
+    color: 'white',
     fontWeight: '500',
   },
   messageContainer: {
@@ -286,6 +287,7 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
   },
   noChatContainer: {
+    backgroundColor: "#f0f7ff",
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',

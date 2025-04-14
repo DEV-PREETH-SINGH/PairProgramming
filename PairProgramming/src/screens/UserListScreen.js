@@ -6,6 +6,7 @@ import auth from '@react-native-firebase/auth';
 import Swiper from 'react-native-deck-swiper';
 import { ChevronLeft, MessageCircle } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import LinearGradient from "react-native-linear-gradient";
 
 const UserListScreen = ({ navigation }) => {
   const [users, setUsers] = useState([]);
@@ -93,27 +94,38 @@ const UserListScreen = ({ navigation }) => {
 
       {users.length > 0 ? (
         <Swiper
-          ref={swiperRef}
-          cards={users}
-          renderCard={(user) => (
-            <View style={styles.userCard}>
-              <Image
-                source={{ uri: user.profilePic || 'https://i.pinimg.com/736x/44/84/b6/4484b675ec3d56549907807fccf75b81.jpg' }}
-                style={styles.profilePic}
-              />
-              <View style={styles.nameContainer}>
-                <Text style={styles.userName}>{user.username}</Text>
-              </View>
-            </View>
-          )}
-          onSwipedRight={handleSwipedRight}
-          onSwipedLeft={handleSwipedLeft}
-          onSwipedAll={handleAllSwiped}
-          cardIndex={0}
-          backgroundColor={'transparent'}
-          stackSize={3}
-          infinite={true}
+  ref={swiperRef}
+  cards={users}
+  renderCard={(user) => (
+    <View style={styles.userCard}>
+      {/* Profile Picture with Gradient Effect */}
+      <View style={styles.profilePicWrapper}>
+        <Image
+          source={{ uri: user.profilePic || 'https://i.pinimg.com/736x/44/84/b6/4484b675ec3d56549907807fccf75b81.jpg' }}
+          style={styles.profilePic}
         />
+        {/* Gradient applied at the bottom of the image */}
+        <LinearGradient
+          colors={['transparent', '#7638b8']}  // Gradient from transparent to purple
+          style={styles.gradientOverlay}
+        />
+      </View>
+
+      {/* Username Container */}
+      <View style={styles.nameContainer}>
+        <Text style={styles.userName}>{user.username}</Text>
+      </View>
+    </View>
+  )}
+  onSwipedRight={handleSwipedRight}
+  onSwipedLeft={handleSwipedLeft}
+  onSwipedAll={handleAllSwiped}
+  cardIndex={0}
+  backgroundColor={'transparent'}
+  stackSize={3}
+  infinite={true}
+/>
+
       ) : (
         <View style={styles.noUsersContainer}>
           <Image source={require('../assets/No_user.jpg')} style={styles.emptyImage} />
@@ -124,10 +136,9 @@ const UserListScreen = ({ navigation }) => {
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#f0f7ff",
+    backgroundColor: "white",
     flex: 1,
     padding: 20,
     justifyContent: 'center',
@@ -137,11 +148,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: '90%', // Equal spacing from top and bottom
     borderRadius: 10,
-    marginTop:-40,
+    marginTop: -40,
+  },
+  profilePicWrapper: {
+    width: '100%',
+    height: '100%', // Set a fixed height for the profile pic container
+    borderRadius: 10,
+    position: 'relative',  // Ensure gradient is positioned over the image
+    overflow: 'hidden',
   },
   profilePic: {
     width: '100%',
     height: '100%',
+    borderRadius: 10,
+  },
+  gradientOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '30%', // Adjust height of gradient as required
     borderRadius: 10,
   },
   nameContainer: {

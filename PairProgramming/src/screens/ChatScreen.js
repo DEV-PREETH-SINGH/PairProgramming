@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TextInput, TouchableOpacity, Image } from 'react-native';
 import axios from 'axios';
 import io from 'socket.io-client'; // Import socket.io-client
 import auth from '@react-native-firebase/auth';
-import { ChevronLeft, Send } from 'lucide-react-native';
+import { ChevronLeft, Send, User } from 'lucide-react-native';
 import { baseUrl } from '@env';
 
 const ChatScreen = ({ route, navigation }) => {
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [otherUserName, setOtherUserName] = useState('');
+  const [otherUserPic, setOtherUserPic] = useState(null);
   const [socket, setSocket] = useState(null);
 
   const currentUserUID = auth().currentUser?.uid;
@@ -24,8 +25,8 @@ const ChatScreen = ({ route, navigation }) => {
     useEffect(() => {
       const placeholderMessages = [
         'Type a message...',
-        './send to send request',
-        './accepted to accept request',
+        './addbuddy to send request',
+        './acceptbuddy to accept request',
       ];
       let currentIndex = 0;
   
@@ -78,20 +79,19 @@ const ChatScreen = ({ route, navigation }) => {
     };
   }, [currentUserUID, extractedOtherUserUID]);
 
-  // Fetch other user's name
+  // Fetch other user's name and profile picture
   useEffect(() => {
-    const fetchOtherUserName = async () => {
+    const fetchOtherUserData = async () => {
       try {
-        const response = await axios.get(`${baseUrl}/api/users/get-username`, {
-          params: { userUID: extractedOtherUserUID }
-        });
+        const response = await axios.get(`${baseUrl}/users/${extractedOtherUserUID}`);
         setOtherUserName(response.data.username);
+        setOtherUserPic(response.data.profilePic);
       } catch (err) {
         console.error('Error fetching user data:', err);
       }
     };
 
-    fetchOtherUserName();
+    fetchOtherUserData();
   }, [extractedOtherUserUID]);
 
   // Fetch existing messages
@@ -133,13 +133,13 @@ const ChatScreen = ({ route, navigation }) => {
       isTemp: true,
     };
 
-    // Add the message to UI immediately for all message types
-    // setMessages((prevMessages) => [...prevMessages, newMessage]);
-
     // Check for special commands
-    if (messageText.trim() === './send' || messageText.trim() === './accepted') {
+    if (messageText.trim() === './addbuddy' || messageText.trim() === './acceptbuddy') {
+      // Add special messages to UI immediately
+      setMessages((prevMessages) => [...prevMessages, newMessage]);
+      
       try {
-        const apiUrl = messageText.trim() === './send' 
+        const apiUrl = messageText.trim() === './addbuddy' 
           ? `${baseUrl}/api/messages/send-special`
           : `${baseUrl}/api/messages/accepted`;
 
@@ -151,22 +151,14 @@ const ChatScreen = ({ route, navigation }) => {
         .then(response => {
           if (response.status === 201) {
             console.log('API call successful:', response.data);
-            // Update the temp message to remove isTemp flag if needed
+            // Update the temp message to remove isTemp flag
             setMessages((prevMessages) =>
               prevMessages.map((msg) =>
                 msg.isTemp && msg._id === newMessage._id
-                  ? { ...msg, isTemp: false }
+                  ? { ...msg, isTemp: false, _id: response.data.messageId || msg._id }
                   : msg
               )
             );
-
-          //   if (socket) {
-          //   socket.emit('sendMessage', {
-          //     senderUID: currentUserUID,
-          //     receiverUID: extractedOtherUserUID,
-          //     message: messageText,
-          //   });
-          // }
           }
         })
         .catch(err => {
@@ -192,7 +184,9 @@ const ChatScreen = ({ route, navigation }) => {
     // Reset the input field
     setMessageText('');
 
-    // Send regular message via socket
+    // For regular messages, don't add them to UI immediately
+    // Instead, rely on the socket to receive and add the message
+    // This prevents duplicate messages
     if (socket) {
       socket.emit('sendMessage', {
         senderUID: currentUserUID,
@@ -200,14 +194,7 @@ const ChatScreen = ({ route, navigation }) => {
         message: messageText,
       }, (response) => {
         if (response?.error) {
-          // Handle send error
-          setMessages((prevMessages) =>
-            prevMessages.map((msg) =>
-              msg.isTemp && msg._id === newMessage._id
-                ? { ...msg, error: 'Failed to send' }
-                : msg
-            )
-          );
+          console.error('Error sending message via socket:', response.error);
         }
       });
     }
@@ -229,7 +216,8 @@ const ChatScreen = ({ route, navigation }) => {
 
   const RenderMessageItem = React.memo(({ item }) => {
     // Check if it's a special message
-    const isSpecialMessage = item.message === './send' || item.message === './accepted';
+    const isSpecialMessage = item.message === './addbuddy' || item.message === './acceptbuddy' || item.message === './addbuddy ' || item.message === './acceptbuddy ';
+    
   
     return (
       <View
@@ -254,7 +242,17 @@ const ChatScreen = ({ route, navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ChevronLeft size={30} color="white" />
         </TouchableOpacity>
-        <Text style={styles.chatHeader}>{otherUserName}</Text>
+        
+        <View style={styles.userInfoContainer}>
+          {otherUserPic ? (
+            <Image source={{ uri: otherUserPic }} style={styles.profilePic} />
+          ) : (
+            <View style={styles.profilePicPlaceholder}>
+              <User size={18} color="white" />
+            </View>
+          )}
+          <Text style={styles.chatHeader}>{otherUserName}</Text>
+        </View>
       </View>
 
       {/* Message list */}
@@ -301,26 +299,47 @@ const styles = StyleSheet.create({
     fontWeight: 'bold', // Optionally make the text bold for special messages
   },
   topBar: {
-    padding:20,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom:15,
+    paddingBottom: 15,
     backgroundColor: '#8b4ad3',
-    marginBottom:20,
+    marginBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
   },
-  renderingMessageBox:{
-    padding:10,
+  userInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    marginLeft: 10,
   },
   chatHeader: {
     fontSize: 22,
     fontWeight: 'bold',
+    color: 'white',
     marginLeft: 10,
-    paddingRight:50,
-    flex: 1,
-    textAlign: 'center',
-    color:'white'
+  },
+  profilePic: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'white',
+  },
+  profilePicPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'white',
+  },
+  renderingMessageBox:{
+    padding:10,
   },
   messageItem: {
     padding: 10,
@@ -335,7 +354,7 @@ const styles = StyleSheet.create({
   },
   receivedMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#d5bdf5',
+    backgroundColor: '#f2ebfc',
   },
   messageText: {
     fontSize: 16,

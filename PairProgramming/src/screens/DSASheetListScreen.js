@@ -1,11 +1,80 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Animated, Dimensions, Linking, SafeAreaView, StatusBar } from "react-native";
 import axios from "axios";
-import { CheckCircle, Circle } from "lucide-react-native"; // Icons for solved status
-import auth from '@react-native-firebase/auth'; // For getting the current user UID
+import { CheckCircle, Circle, ArrowLeft } from "lucide-react-native";
+import auth from '@react-native-firebase/auth';
 import { baseUrl } from "@env";
+import LinearGradient from "react-native-linear-gradient";
 
-const DSASheetListScreen = () => {
+const { width } = Dimensions.get('window');
+
+// Skeleton component for DSA problem item
+const SkeletonProblemItem = ({ shimmerAnim }) => {
+  const shimmerTranslate = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-width, width],
+  });
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.skeletonTitle}>
+        <Animated.View
+          style={[
+            styles.shimmerOverlay,
+            { transform: [{ translateX: shimmerTranslate }] },
+          ]}
+        />
+      </View>
+      <View style={styles.skeletonDifficulty}>
+        <Animated.View
+          style={[
+            styles.shimmerOverlay,
+            { transform: [{ translateX: shimmerTranslate }] },
+          ]}
+        />
+      </View>
+      <View style={styles.skeletonCircle}>
+        <Animated.View
+          style={[
+            styles.shimmerOverlay,
+            { transform: [{ translateX: shimmerTranslate }] },
+          ]}
+        />
+      </View>
+    </View>
+  );
+};
+
+// Skeleton loading component for DSA sheet list
+const SkeletonDSAList = () => {
+  const shimmerAnim = React.useRef(new Animated.Value(0)).current;
+  
+  React.useEffect(() => {
+    const shimmerAnimation = Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 1500,
+        useNativeDriver: true,
+      })
+    );
+    
+    shimmerAnimation.start();
+    
+    return () => {
+      shimmerAnimation.stop();
+    };
+  }, []);
+
+  return (
+    <View style={styles.listContainer}>
+      {[...Array(8)].map((_, index) => (
+        <SkeletonProblemItem key={`skeleton-${index}`} shimmerAnim={shimmerAnim} />
+      ))}
+    </View>
+  );
+};
+
+const DSASheetListScreen = ({ navigation }) => {
   const [problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,18 +83,16 @@ const DSASheetListScreen = () => {
   }, []);
 
   const fetchProblems = async () => {
-    const currentUserUID = auth().currentUser?.uid; // Get current user UID
+    const currentUserUID = auth().currentUser?.uid;
     if (!currentUserUID) {
       console.error("User not authenticated");
       return;
     }
 
     try {
-      // Pass the user UID in the API call to fetch problems with solved status
       const response = await axios.get(`${baseUrl}/api/dsa-problems`, {
         params: { uid: currentUserUID }
       });
-      console.log(response.data)
       setProblems(response.data);
       setLoading(false);
     } catch (error) {
@@ -33,16 +100,16 @@ const DSASheetListScreen = () => {
       setLoading(false);
     }
   };
+
   const toggleSolvedStatus = async (title, solved) => {
     try {
-      const currentUserUID = auth().currentUser?.uid; // Get current user UID
-      const response = await axios.patch(`${baseUrl}/api/dsa-problems/${title}`, {  // Use title in the URL as it should be the identifier
-        solved: !solved,  // Toggle solved status
-        uid: currentUserUID,  // Pass the user ID to the backend
+      const currentUserUID = auth().currentUser?.uid;
+      const response = await axios.patch(`${baseUrl}/api/dsa-problems/${title}`, {
+        solved: !solved,
+        uid: currentUserUID,
       });
   
       if (response.status === 200) {
-        // Update the UI state for the problem
         setProblems(problems.map((problem) =>
           problem.title === title ? { ...problem, solved: !solved } : problem
         ));
@@ -51,62 +118,181 @@ const DSASheetListScreen = () => {
       console.error("Error updating solved status:", error);
     }
   };
+
+  const getDifficultyColor = (difficulty) => {
+    switch (difficulty?.toLowerCase()) {
+      case 'easy':
+        return '#4BC0C0';
+      case 'medium':
+        return '#FF9F40';
+      case 'hard':
+        return '#FF6384';
+      default:
+        return '#8b4ad3';
+    }
+  };
   
   const renderItem = ({ item }) => (
-    <View style={styles.card}>
-      <Text style={styles.title}>{item.title}</Text>
-      <Text style={styles.difficulty}>{item.difficulty}</Text>
-      <TouchableOpacity onPress={() => toggleSolvedStatus(item.title, item.solved)}>
-        {item.solved ? <CheckCircle color="green" size={24} /> : <Circle color="gray" size={24} />}
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => Linking.openURL(item.url)}>
-        <Text style={styles.practiceButton}>Practice</Text>
-      </TouchableOpacity>
-    </View>
+    <LinearGradient
+      colors={['#ffffff', '#f8f4fe']}
+      style={styles.card}
+    >
+      <View style={styles.cardContent}>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>{item.title}</Text>
+          <Text style={[styles.difficulty, { color: getDifficultyColor(item.difficulty) }]}>
+            {item.difficulty}
+          </Text>
+        </View>
+        <View style={styles.actionContainer}>
+          <TouchableOpacity 
+            style={styles.solvedButton}
+            onPress={() => toggleSolvedStatus(item.title, item.solved)}
+          >
+            {item.solved ? 
+              <CheckCircle color="#4BC0C0" size={24} /> : 
+              <Circle color="#8b4ad3" size={24} />
+            }
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.practiceButton}
+            onPress={() => Linking.openURL(item.url)}
+          >
+            <Text style={styles.practiceButtonText}>Practice</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </LinearGradient>
   );
   
   return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>DSA Sheet List</Text>
-      {loading ? <ActivityIndicator size="large" color="#007bff" /> : (
-        <FlatList data={problems} keyExtractor={(item) => item.id.toString()} renderItem={renderItem} />
-      )}
-    </View>
+    <SafeAreaView style={styles.container}>
+      <StatusBar backgroundColor="#8b4ad3" barStyle="light-content" />
+      <LinearGradient
+        colors={['#8b4ad3', '#bc93ed']}
+        style={styles.header}
+      >
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <ArrowLeft color="#fff" size={24} />
+        </TouchableOpacity>
+        <Text style={styles.heading}>Striver's DSA Sheet</Text>
+      </LinearGradient>
+      <View style={styles.listContainer}>
+        {loading ? <SkeletonDSAList /> : (
+          <FlatList 
+            data={problems}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: "#fff",
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  backButton: {
+    marginRight: 16,
+  },
   heading: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 12,
+    color: "#fff",
+  },
+  listContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  listContent: {
+    paddingBottom: 20,
   },
   card: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderColor: "#ddd",
+    marginBottom: 12,
+    borderRadius: 12,
+    //elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  cardContent: {
+    padding: 16,
+  },
+  titleContainer: {
+    marginBottom: 12,
   },
   title: {
     fontSize: 16,
-    flex: 2,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
   },
   difficulty: {
     fontSize: 14,
-    fontWeight: "bold",
-    color: "#555",
-    flex: 1,
+    fontWeight: "500",
+  },
+  actionContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  solvedButton: {
+    padding: 4,
   },
   practiceButton: {
-    color: "#007bff",
-    fontSize: 16,
+    backgroundColor: '#8b4ad3',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  practiceButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Skeleton styles
+  skeletonTitle: {
+    height: 16,
+    width: '70%',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonDifficulty: {
+    height: 14,
+    width: '30%',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  skeletonCircle: {
+    height: 24,
+    width: 24,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 12,
+  },
+  shimmerOverlay: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
 });
 

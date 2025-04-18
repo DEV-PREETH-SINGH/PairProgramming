@@ -1,0 +1,262 @@
+#!/bin/bash
+
+# w25backups.sh - Continuous backup script
+# Synopsis: w25backup.sh $1 $2 $3 $4
+# Usage: w25backup.sh [file_extension1] [file_extension2] [file_extension3] [file_extension4]
+
+# Directories for storing backups (relative to $HOME)
+BACKUP_ROOT="$HOME/backup"
+FULL_BACKUP_DIR="$BACKUP_ROOT/fullbup"
+INC_BACKUP_DIR="$BACKUP_ROOT/incbup"
+DIFF_BACKUP_DIR="$BACKUP_ROOT/diffbup"
+INCSIZE_BACKUP_DIR="$BACKUP_ROOT/incsizebup"
+LOG_FILE="$BACKUP_ROOT/w25log.txt"
+SOURCE_DIR="$HOME"  # Using relative path (Home Directory)
+
+# Create backup directories if they don't exist
+mkdir -p "$FULL_BACKUP_DIR" "$INC_BACKUP_DIR" "$DIFF_BACKUP_DIR" "$INCSIZE_BACKUP_DIR"
+
+# Initialize counters for backup file naming
+FULL_COUNT=1
+INC_COUNT=1
+DIFF_COUNT=1
+INCSIZE_COUNT=1
+
+# Get the current date in YYYYMMDD format
+DATE=$(date +%Y%m%d)
+
+# Function to log messages
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+}
+
+# Function to construct find command based on file extensions
+construct_find_command() {
+    local find_cmd="find \"$SOURCE_DIR\" -type f"
+    
+    # If no arguments are provided, include all files
+    if [ $# -eq 0 ]; then
+        return 0
+    fi
+    
+    # Construct the find command to include specified file extensions
+    find_cmd="$find_cmd \( "
+    first=true
+    
+    for ext in "$@"; do
+        if $first; then
+            find_cmd="$find_cmd -name \"*$ext\""
+            first=false
+        else
+            find_cmd="$find_cmd -o -name \"*$ext\""
+        fi
+    done
+    
+    find_cmd="$find_cmd \)"
+    echo "$find_cmd"
+}
+
+# Function to create a full backup
+create_full_backup() {
+    local full_backup_file="$FULL_BACKUP_DIR/fullbup${DATE}_${FULL_COUNT}.tar"
+    
+    # Create the find command
+    local find_command=$(construct_find_command "$@")
+    
+    # Execute the find command and create the tar file
+    if [ -z "$find_command" ]; then
+        # No specific extensions, backup all files
+        find "$SOURCE_DIR" -type f -print0 | tar -cf "$full_backup_file" --null -T -
+    else
+        # Use the constructed find command
+        eval "$find_command -print0" | tar -cf "$full_backup_file" --null -T -
+    fi
+    
+    # Log the backup
+    log_message "Full backup created: $(basename "$full_backup_file")"
+    
+    # Create a timestamp file to track when the full backup was created
+    date +%s > "$FULL_BACKUP_DIR/fullbup_${FULL_COUNT}_time"
+    
+    # Increment the counter
+    FULL_COUNT=$((FULL_COUNT + 1))
+}
+
+# Function to create an incremental backup
+create_incremental_backup() {
+    local reference_time=$1
+    local counter=$2
+    local inc_backup_file="$INC_BACKUP_DIR/inc${DATE}_${counter}.tar"
+    local files_found=false
+    
+    # Create a temporary file list
+    local temp_file_list=$(mktemp)
+    
+    # Find files newer than the reference time
+    if [ $# -le 2 ]; then
+        # No specific extensions, consider all files
+        find "$SOURCE_DIR" -type f -newermt "@$reference_time" -print > "$temp_file_list"
+    else
+        # Use the specified extensions
+        local extensions=("${@:3}")
+        local find_cmd="find \"$SOURCE_DIR\" -type f -newermt \"@$reference_time\" \( "
+        local first=true
+        
+        for ext in "${extensions[@]}"; do
+            if $first; then
+                find_cmd="$find_cmd -name \"*$ext\""
+                first=false
+            else
+                find_cmd="$find_cmd -o -name \"*$ext\""
+            fi
+        done
+        
+        find_cmd="$find_cmd \)"
+        eval "$find_cmd -print" > "$temp_file_list"
+    fi
+    
+    # Check if any files were found
+    if [ -s "$temp_file_list" ]; then
+        tar -cf "$inc_backup_file" -T "$temp_file_list"
+        log_message "Incremental backup created: $(basename "$inc_backup_file")"
+        files_found=true
+    else
+        log_message "No new/modified files found for incremental backup"
+    fi
+    
+    # Cleanup
+    rm "$temp_file_list"
+    
+    # Record the current time for the next incremental backup
+    date +%s > "$INC_BACKUP_DIR/inc_${counter}_time"
+    
+    # Return whether files were found
+    $files_found && return 0 || return 1
+}
+
+# Function to create a differential backup
+create_differential_backup() {
+    local full_backup_time=$1
+    local diff_backup_file="$DIFF_BACKUP_DIR/diff${DATE}_${DIFF_COUNT}.tar"
+    local files_found=false
+    
+    # Create a temporary file list
+    local temp_file_list=$(mktemp)
+    
+    # Find files newer than the full backup time
+    if [ $# -le 1 ]; then
+        # No specific extensions, consider all files
+        find "$SOURCE_DIR" -type f -newermt "@$full_backup_time" -print > "$temp_file_list"
+    else
+        # Use the specified extensions
+        local extensions=("${@:2}")
+        local find_cmd="find \"$SOURCE_DIR\" -type f -newermt \"@$full_backup_time\" \( "
+        local first=true
+        
+        for ext in "${extensions[@]}"; do
+            if $first; then
+                find_cmd="$find_cmd -name \"*$ext\""
+                first=false
+            else
+                find_cmd="$find_cmd -o -name \"*$ext\""
+            fi
+        done
+        
+        find_cmd="$find_cmd \)"
+        eval "$find_cmd -print" > "$temp_file_list"
+    fi
+    
+    # Check if any files were found
+    if [ -s "$temp_file_list" ]; then
+        tar -cf "$diff_backup_file" -T "$temp_file_list"
+        log_message "Differential backup created: $(basename "$diff_backup_file")"
+        files_found=true
+    else
+        log_message "No new/modified files found for differential backup"
+    fi
+    
+    # Cleanup
+    rm "$temp_file_list"
+    
+    # Increment the counter
+    DIFF_COUNT=$((DIFF_COUNT + 1))
+    
+    # Return whether files were found
+    $files_found && return 0 || return 1
+}
+
+# Function to create an incremental_size backup (files > 100KB)
+create_incremental_size_backup() {
+    local full_backup_time=$1
+    local incsize_backup_file="$INCSIZE_BACKUP_DIR/incsize${DATE}_${INCSIZE_COUNT}.tar"
+    local files_found=false
+    
+    # Create a temporary file list
+    local temp_file_list=$(mktemp)
+    
+    # Find files newer than the full backup time and larger than 100KB
+    if [ $# -le 1 ]; then
+        # No specific extensions, consider all files
+        find "$SOURCE_DIR" -type f -newermt "@$full_backup_time" -size +100k -print > "$temp_file_list"
+    else
+        # Use the specified extensions
+        local extensions=("${@:2}")
+        local find_cmd="find \"$SOURCE_DIR\" -type f -newermt \"@$full_backup_time\" -size +100k \( "
+        local first=true
+        
+        for ext in "${extensions[@]}"; do
+            if $first; then
+                find_cmd="$find_cmd -name \"*$ext\""
+                first=false
+            else
+                find_cmd="$find_cmd -o -name \"*$ext\""
+            fi
+        done
+        
+        find_cmd="$find_cmd \)"
+        eval "$find_cmd -print" > "$temp_file_list"
+    fi
+    
+    # Check if any files were found
+    if [ -s "$temp_file_list" ]; then
+        tar -cf "$incsize_backup_file" -T "$temp_file_list"
+        log_message "Incremental size backup created: $(basename "$incsize_backup_file")"
+        files_found=true
+    else
+        log_message "No new/modified files > 100KB found for incremental size backup"
+    fi
+    
+    # Cleanup
+    rm "$temp_file_list"
+    
+    # Increment the counter
+    INCSIZE_COUNT=$((INCSIZE_COUNT + 1))
+    
+    # Return whether files were found
+    $files_found && return 0 || return 1
+}
+
+# Main backup loop
+main() {
+    log_message "Starting w25backups.sh with arguments: $*"
+    
+    while true; do
+        # STEP 1: Create a full backup
+        create_full_backup "$@"
+        full_backup_time=$(cat "$FULL_BACKUP_DIR/fullbup_$((FULL_COUNT-1))_time")
+        
+        # STEP 2: Create incremental backups
+        create_incremental_backup "$full_backup_time" "$INC_COUNT" "$@"
+        
+        # STEP 3: Create differential backups
+        create_differential_backup "$full_backup_time" "$@"
+        
+        # STEP 4: Create incremental size backups
+        create_incremental_size_backup "$full_backup_time" "$@"
+        
+        sleep 86400  # Sleep for 24 hours
+    done
+}
+
+# Start the backup process
+main "$@"

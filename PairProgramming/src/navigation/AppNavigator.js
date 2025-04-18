@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import auth from '@react-native-firebase/auth';
 import { ActivityIndicator, View } from 'react-native';
+import axios from 'axios';
+import { baseUrl } from "@env";
 
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
@@ -20,10 +22,38 @@ const Stack = createStackNavigator();
 const AppNavigator = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [hasProfile, setHasProfile] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = auth().onAuthStateChanged((user) => {
-      setUser(user);
+    const unsubscribe = auth().onAuthStateChanged(async (authUser) => {
+      setUser(authUser);
+      
+      if (authUser) {
+        // Check if user has a profile
+        try {
+          const response = await axios.get(`${baseUrl}/user/${authUser.uid}`);
+          // If we can get user data, profile exists
+          if (response.status === 200 && response.data) {
+            // Check if essential profile data exists
+            const profileData = response.data;
+            if (profileData.username && profileData.leetcodeProfileId && profileData.profilePic) {
+              setHasProfile(true);
+            } else {
+              setHasProfile(false);
+            }
+          } else {
+            setHasProfile(false);
+          }
+        } catch (error) {
+          // If API call fails, assume profile doesn't exist
+          console.log('Error checking profile:', error);
+          setHasProfile(false);
+        }
+      } else {
+        // Explicitly set hasProfile to false when user is not authenticated
+        setHasProfile(false);
+      }
+      
       setLoading(false);
     });
 
@@ -38,7 +68,14 @@ const AppNavigator = () => {
     );
   }
 
-  const initialRoute = user ? 'Home' : 'Login';
+  // Determine initial route based on authentication and profile status
+  let initialRoute = 'Login';
+  if (user) {
+    initialRoute = hasProfile ? 'Home' : 'ProfileCompletion';
+  } else {
+    // Ensure we always go to Login when there's no authenticated user
+    initialRoute = 'Login';
+  }
 
   return (
     <Stack.Navigator initialRouteName={initialRoute}>

@@ -10,13 +10,15 @@ import {
   Alert,
   ScrollView,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  StatusBar
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import { launchImageLibrary } from 'react-native-image-picker';
+import LinearGradient from 'react-native-linear-gradient';
 
 const ProfileCompletionScreen = () => {
   const navigation = useNavigation();
@@ -28,28 +30,20 @@ const ProfileCompletionScreen = () => {
   // Profile picture state
   const [profilePic, setProfilePic] = useState(null);
   
-  // Step 1: Personal Info & Preferences
+  // Step 1: Personal Info
   const [username, setUsername] = useState('');
+  const [leetcodeProfileId, setLeetcodeProfileId] = useState('');
+  
+  // Step 2: Language & Time Preferences
   const [preferredLanguage, setPreferredLanguage] = useState('');
   const [otherLanguage, setOtherLanguage] = useState('');
   const [preferredSolvingTime, setPreferredSolvingTime] = useState('');
+  
+  // Step 3: DSA Preferences
   const [dsaSheet, setDsaSheet] = useState('');
   const [otherDsaSheet, setOtherDsaSheet] = useState('');
   const [dailyProblems, setDailyProblems] = useState('');
   const [customDailyProblems, setCustomDailyProblems] = useState('');
-  
-  // Step 2: Goals & Preferences
-  const [codingGoal, setCodingGoal] = useState('');
-  const [codingLevel, setCodingLevel] = useState('');
-  const [codingSpeed, setCodingSpeed] = useState('');
-  
-  // Step 3: Matching Preferences
-  const [solvePreference, setSolvePreference] = useState('');
-  const [partnerPreference, setPartnerPreference] = useState('');
-  
-  // Step 4: Bio
-  const [bio, setBio] = useState('');
-  const [leetcodeProfileId, setLeetcodeProfileId] = useState('');
 
   // Select profile image
   const selectImage = () => {
@@ -62,7 +56,7 @@ const ProfileCompletionScreen = () => {
 
   // Handle navigation between steps
   const nextStep = () => {
-    if (currentStep < 4) {
+    if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }
@@ -79,28 +73,20 @@ const ProfileCompletionScreen = () => {
   const validateStep = () => {
     switch (currentStep) {
       case 1:
+        if (!profilePic) return "Please select a profile picture";
         if (!username) return "Please enter your username";
+        if (!leetcodeProfileId) return "Please enter your Leetcode Profile ID";
+        break;
+      case 2:
         if (!preferredLanguage) return "Please select your preferred coding language";
         if (preferredLanguage === 'Other' && !otherLanguage) return "Please specify your coding language";
         if (!preferredSolvingTime) return "Please select your preferred coding time";
+        break;
+      case 3:
         if (!dsaSheet) return "Please select a DSA sheet";
         if (dsaSheet === 'Other' && !otherDsaSheet) return "Please specify your DSA sheet";
         if (!dailyProblems) return "Please select how many problems you want to solve daily";
         if (dailyProblems === 'Custom' && !customDailyProblems) return "Please specify how many problems";
-        break;
-      case 2:
-        if (!codingGoal) return "Please select your coding goal";
-        if (!codingLevel) return "Please select your coding level";
-        if (!codingSpeed) return "Please select your preferred coding speed";
-        break;
-      case 3:
-        if (!solvePreference) return "Please select how you want to solve problems";
-        if (!partnerPreference) return "Please select what you're looking for in a partner";
-        break;
-      case 4:
-        if (!bio) return "Please write a short bio";
-        if (!leetcodeProfileId) return "Please enter your Leetcode Profile ID";
-        if (!profilePic) return "Please select a profile picture";
         break;
       default:
         return null;
@@ -141,25 +127,15 @@ const ProfileCompletionScreen = () => {
       formData.append('uid', currentUser.uid);
       formData.append('email', currentUser.email);
       formData.append('username', username);
-      
-      // Step 1 data
-      formData.append('preferredLanguage', preferredLanguage === 'Other' ? otherLanguage : preferredLanguage);
-      formData.append('preferredSolvingTime', preferredSolvingTime);
-      formData.append('dsaSheet', dsaSheet === 'Other' ? otherDsaSheet : dsaSheet);
-      formData.append('dailyProblems', dailyProblems === 'Custom' ? customDailyProblems : dailyProblems);
+      formData.append('leetcodeProfileId', leetcodeProfileId);
       
       // Step 2 data
-      formData.append('codingGoal', codingGoal);
-      formData.append('codingLevel', codingLevel);
-      formData.append('codingSpeed', codingSpeed);
+      formData.append('preferredLanguage', preferredLanguage === 'Other' ? otherLanguage : preferredLanguage);
+      formData.append('preferredSolvingTime', preferredSolvingTime);
       
       // Step 3 data
-      formData.append('solvePreference', solvePreference);
-      formData.append('partnerPreference', partnerPreference);
-      
-      // Step 4 data
-      formData.append('bio', bio);
-      formData.append('leetcodeProfileId', leetcodeProfileId);
+      formData.append('dsaSheet', dsaSheet === 'Other' ? otherDsaSheet : dsaSheet);
+      formData.append('dailyProblems', dailyProblems === 'Custom' ? customDailyProblems : dailyProblems);
 
       const response = await axios.post(`${baseUrl}/create-profile`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -178,13 +154,13 @@ const ProfileCompletionScreen = () => {
 
   // Render the progress bar
   const renderProgressBar = () => {
-    const totalSteps = 4;
+    const totalSteps = 3;
     const progressWidth = (currentStep / totalSteps) * 100;
     
     return (
       <View style={styles.progressBarContainer}>
         <View style={styles.progressLabels}>
-          {[1, 2, 3, 4].map((step) => (
+          {[1, 2, 3].map((step) => (
             <Text 
               key={step} 
               style={[
@@ -192,10 +168,9 @@ const ProfileCompletionScreen = () => {
                 currentStep >= step ? styles.activeLabel : styles.inactiveLabel
               ]}
             >
-              {step === 1 && "Personal Info"}
-              {step === 2 && "Goals & Skills"}
-              {step === 3 && "Matching"}
-              {step === 4 && "Bio & Finish"}
+              {step === 1 && "Profile Info"}
+              {step === 2 && "Language & Time"}
+              {step === 3 && "DSA Preferences"}
             </Text>
           ))}
         </View>
@@ -212,169 +187,96 @@ const ProfileCompletionScreen = () => {
       case 1:
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Step 1: Getting Started - Personal Info & Preferences</Text>
+            <Text style={styles.stepTitle}>Complete Your Profile</Text>
+            <Text style={styles.stepDescription}>Let's set up your profile so you can find the perfect coding partner.</Text>
             
-            <TextInput
-              style={styles.input}
-              value={username}
-              onChangeText={setUsername}
-              placeholder="Username"
-              placeholderTextColor="#888"
-            />
-
-            <Text style={styles.questionText}>What's your coding language of choice?</Text>
-           
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={preferredLanguage}
-                style={styles.picker}
-                onValueChange={setPreferredLanguage}
-              >
-                <Picker.Item label="Select Programming Language" value="" />
-                <Picker.Item label="Python 🐍" value="Python" />
-                <Picker.Item label="Java ☕" value="Java" />
-                <Picker.Item label="C++ 🚀" value="C++" />
-                <Picker.Item label="JavaScript 💻" value="JavaScript" />
-                <Picker.Item label="Other" value="Other" />
-              </Picker>
-            </View>
+            <TouchableOpacity onPress={selectImage} style={styles.imageContainer}>
+              {profilePic ? (
+                <Image source={{ uri: profilePic.uri }} style={styles.profilePic} />
+              ) : (
+                <View style={styles.imagePlaceholderContainer}>
+                  <Text style={styles.imagePlaceholder}>Upload Photo</Text>
+                </View>
+              )}
+            </TouchableOpacity>
             
-            {preferredLanguage === 'Other' && (
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Username</Text>
               <TextInput
                 style={styles.input}
-                value={otherLanguage}
-                onChangeText={setOtherLanguage}
-                placeholder="Specify your language"
-                placeholderTextColor="#888"
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Enter your username"
+                placeholderTextColor="#8a8a8a"
               />
-            )}
-
-            <Text style={styles.questionText}>When do you typically code?</Text>
-            
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={preferredSolvingTime}
-                style={styles.picker}
-                onValueChange={setPreferredSolvingTime}
-              >
-                <Picker.Item label="Select Preferred Coding Time" value="" />
-                <Picker.Item label="Morning ☀️" value="Morning" />
-                <Picker.Item label="Afternoon 🌤" value="Afternoon" />
-                <Picker.Item label="Evening 🌙" value="Evening" />
-                <Picker.Item label="Late Night 🦉" value="Late Night" />
-                <Picker.Item label="Anytime ⏳" value="Anytime" />
-              </Picker>
-            </View>
-
-            <Text style={styles.questionText}>Which DSA sheet are you currently working on?</Text>
-            
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={dsaSheet}
-                style={styles.picker}
-                onValueChange={setDsaSheet}
-              >
-                <Picker.Item label="Select DSA Sheet" value="" />
-                <Picker.Item label="Blind75 🏆" value="Blind75" />
-                <Picker.Item label="NeetCode 📜" value="NeetCode" />
-                <Picker.Item label="Striver's Guide 🚀" value="Striver's Guide" />
-                <Picker.Item label="LeetCode Top 100" value="LeetCode Top 100" />
-                <Picker.Item label="My Own Path 🛤️" value="My Own Path" />
-              </Picker>
             </View>
             
-            {dsaSheet === 'Other' && (
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>LeetCode Profile ID</Text>
               <TextInput
                 style={styles.input}
-                value={otherDsaSheet}
-                onChangeText={setOtherDsaSheet}
-                placeholder="Specify your DSA sheet"
-                placeholderTextColor="#888"
+                value={leetcodeProfileId}
+                onChangeText={setLeetcodeProfileId}
+                placeholder="Enter your LeetCode username"
+                placeholderTextColor="#8a8a8a"
               />
-            )}
-
-            <Text style={styles.questionText}>How many problems do you want to solve each day?</Text>
-            
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={dailyProblems}
-                style={styles.picker}
-                onValueChange={setDailyProblems}
-              >
-                <Picker.Item label="Select Daily Problems" value="" />
-                <Picker.Item label="1️⃣" value="1" />
-                <Picker.Item label="2️⃣" value="2" />
-                <Picker.Item label="3️⃣" value="3" />
-                <Picker.Item label="4️⃣" value="4" />
-                <Picker.Item label="5️⃣+" value="5+" />
-                <Picker.Item label="Custom" value="Custom" />
-              </Picker>
             </View>
-            
-            {dailyProblems === 'Custom' && (
-              <TextInput
-                style={styles.input}
-                value={customDailyProblems}
-                onChangeText={setCustomDailyProblems}
-                placeholder="How many problems?"
-                keyboardType="numeric"
-                placeholderTextColor="#888"
-              />
-            )}
           </View>
         );
       
       case 2:
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Step 2: Your Goals & Preferences</Text>
+            <Text style={styles.stepTitle}>Your Coding Preferences</Text>
+            <Text style={styles.stepDescription}>Tell us about your coding habits to find compatible partners.</Text>
             
-            <Text style={styles.questionText}>What's your ultimate coding goal?</Text>
-            
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={codingGoal}
-                style={styles.picker}
-                onValueChange={setCodingGoal}
-              >
-                <Picker.Item label="Select Your Coding Goal" value="" />
-                <Picker.Item label="FAANG interviews 🏢" value="FAANG interviews" />
-                <Picker.Item label="Competitive Programming 🏆" value="Competitive Programming" />
-                <Picker.Item label="DSA Mastery 🧠" value="DSA Mastery" />
-                <Picker.Item label="Coding for fun 🎮" value="Coding for fun" />
-                <Picker.Item label="Just here to learn!" value="Just learning" />
-              </Picker>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>What's your coding language of choice?</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={preferredLanguage}
+                  style={styles.picker}
+                  onValueChange={setPreferredLanguage}
+                >
+                  <Picker.Item label="Select Programming Language" value="" />
+                  <Picker.Item label="Python 🐍" value="Python" />
+                  <Picker.Item label="Java ☕" value="Java" />
+                  <Picker.Item label="C++ 🚀" value="C++" />
+                  <Picker.Item label="JavaScript 💻" value="JavaScript" />
+                  <Picker.Item label="Other" value="Other" />
+                </Picker>
+              </View>
             </View>
-
-            <Text style={styles.questionText}>What's your current coding level?</Text>
             
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={codingLevel}
-                style={styles.picker}
-                onValueChange={setCodingLevel}
-              >
-                <Picker.Item label="Select Your Coding Level" value="" />
-                <Picker.Item label="Beginner 👶" value="Beginner" />
-                <Picker.Item label="Intermediate 🚀" value="Intermediate" />
-                <Picker.Item label="Expert 🏆" value="Expert" />
-              </Picker>
-            </View>
+            {preferredLanguage === 'Other' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Your Language</Text>
+                <TextInput
+                  style={styles.input}
+                  value={otherLanguage}
+                  onChangeText={setOtherLanguage}
+                  placeholder="Specify your language"
+                  placeholderTextColor="#8a8a8a"
+                />
+              </View>
+            )}
 
-            <Text style={styles.questionText}>What's your preferred coding speed?</Text>
-            
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={codingSpeed}
-                style={styles.picker}
-                onValueChange={setCodingSpeed}
-              >
-                <Picker.Item label="Select Your Coding Speed" value="" />
-                <Picker.Item label="Lightning Fast ⚡" value="Lightning Fast" />
-                <Picker.Item label="Steady and Fast 🚀" value="Steady and Fast" />
-                <Picker.Item label="Thorough & Detailed 🧠" value="Thorough & Detailed" />
-                <Picker.Item label="Take My Time 🕰️" value="Take My Time" />
-              </Picker>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>When do you typically code?</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={preferredSolvingTime}
+                  style={styles.picker}
+                  onValueChange={setPreferredSolvingTime}
+                >
+                  <Picker.Item label="Select Preferred Coding Time" value="" />
+                  <Picker.Item label="Morning ☀️" value="Morning" />
+                  <Picker.Item label="Afternoon 🌤" value="Afternoon" />
+                  <Picker.Item label="Evening 🌙" value="Evening" />
+                  <Picker.Item label="Late Night 🦉" value="Late Night" />
+                  <Picker.Item label="Anytime ⏳" value="Anytime" />
+                </Picker>
+              </View>
             </View>
           </View>
         );
@@ -382,78 +284,72 @@ const ProfileCompletionScreen = () => {
       case 3:
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Step 3: Matching Preferences</Text>
+            <Text style={styles.stepTitle}>DSA Learning Plan</Text>
+            <Text style={styles.stepDescription}>Set your DSA learning goals to track your progress together.</Text>
             
-            <Text style={styles.questionText}>How do you want to solve problems with your partner?</Text>
-            <Text style={styles.subText}>
-              Would you like to solve problems in real-time together or separately? Let us know your style.
-            </Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={solvePreference}
-                style={styles.picker}
-                onValueChange={setSolvePreference}
-              >
-                <Picker.Item label="Select Your Preferred Approach" value="" />
-                <Picker.Item label="Solving Together in Real-time 🤝" value="Real-time" />
-                <Picker.Item label="Solving Separately and Discussing Later 💬" value="Separately" />
-                <Picker.Item label="Either way 🎯" value="Either" />
-              </Picker>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Which DSA sheet are you working on?</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={dsaSheet}
+                  style={styles.picker}
+                  onValueChange={setDsaSheet}
+                >
+                  <Picker.Item label="Select DSA Sheet" value="" />
+                  <Picker.Item label="Blind75 🏆" value="Blind75" />
+                  <Picker.Item label="NeetCode 📜" value="NeetCode" />
+                  <Picker.Item label="Striver's Guide 🚀" value="Striver's Guide" />
+                  <Picker.Item label="LeetCode Top 100" value="LeetCode Top 100" />
+                  <Picker.Item label="My Own Path 🛤️" value="My Own Path" />
+                </Picker>
+              </View>
             </View>
+            
+            {dsaSheet === 'Other' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Custom DSA Sheet</Text>
+                <TextInput
+                  style={styles.input}
+                  value={otherDsaSheet}
+                  onChangeText={setOtherDsaSheet}
+                  placeholder="Specify your DSA sheet"
+                  placeholderTextColor="#8a8a8a"
+                />
+              </View>
+            )}
 
-            <Text style={styles.questionText}>What are you looking for in a coding partner?</Text>
-            <Text style={styles.subText}>
-              Are you looking for motivation, friendly competition, or a mix of both?
-            </Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={partnerPreference}
-                style={styles.picker}
-                onValueChange={setPartnerPreference}
-              >
-                <Picker.Item label="Select What You're Looking For" value="" />
-                <Picker.Item label="Support & Motivation 💪" value="Support & Motivation" />
-                <Picker.Item label="Healthy Competition 🏁" value="Healthy Competition" />
-                <Picker.Item label="Both – Let's Code! 🔥" value="Both" />
-              </Picker>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Daily problem goal?</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={dailyProblems}
+                  style={styles.picker}
+                  onValueChange={setDailyProblems}
+                >
+                  <Picker.Item label="Select Daily Problems" value="" />
+                  <Picker.Item label="1️⃣ problem" value="1" />
+                  <Picker.Item label="2️⃣ problems" value="2" />
+                  <Picker.Item label="3️⃣ problems" value="3" />
+                  <Picker.Item label="4️⃣ problems" value="4" />
+                  <Picker.Item label="5️⃣+ problems" value="5+" />
+                  <Picker.Item label="Custom" value="Custom" />
+                </Picker>
+              </View>
             </View>
-          </View>
-        );
-      
-      case 4:
-        return (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Step 4: Final Bio Setup</Text>
             
-            <TouchableOpacity onPress={selectImage} style={styles.imageContainer}>
-              {profilePic ? (
-                <Image source={{ uri: profilePic.uri }} style={styles.profilePic} />
-              ) : (
-                <Text style={styles.imagePlaceholder}>Select Profile Picture</Text>
-              )}
-            </TouchableOpacity>
-            
-            <TextInput
-              style={styles.input}
-              value={leetcodeProfileId}
-              onChangeText={setLeetcodeProfileId}
-              placeholder="Leetcode Profile ID"
-              placeholderTextColor="#888"
-            />
-            
-            <Text style={styles.questionText}>Bio Description</Text>
-            <Text style={styles.subText}>
-              Share a little more about yourself – any special interests or projects you're working on?
-            </Text>
-            <TextInput
-              style={styles.textArea}
-              value={bio}
-              onChangeText={setBio}
-              placeholder="Tell us about yourself..."
-              placeholderTextColor="#888"
-              multiline
-              numberOfLines={4}
-            />
+            {dailyProblems === 'Custom' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Custom Goal</Text>
+                <TextInput
+                  style={styles.input}
+                  value={customDailyProblems}
+                  onChangeText={setCustomDailyProblems}
+                  placeholder="How many problems?"
+                  keyboardType="numeric"
+                  placeholderTextColor="#8a8a8a"
+                />
+              </View>
+            )}
           </View>
         );
       
@@ -474,10 +370,13 @@ const ProfileCompletionScreen = () => {
         </TouchableOpacity>
       )}
       
-      {currentStep < 4 ? (
+      {currentStep < 3 ? (
         <TouchableOpacity
           onPress={handleNext}
-          style={styles.nextButton}
+          style={[
+            styles.nextButton,
+            currentStep <= 1 ? styles.fullWidthButton : null
+          ]}
         >
           <Text style={styles.nextButtonText}>Next</Text>
         </TouchableOpacity>
@@ -494,27 +393,56 @@ const ProfileCompletionScreen = () => {
   );
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      {renderProgressBar()}
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <View style={styles.safeArea}>
+      <StatusBar backgroundColor="#8b4ad3" barStyle="light-content" />
+      <LinearGradient
+        colors={['#8b4ad3', '#bc93ed']}
+        style={styles.header}
       >
-        {renderStep()}
-        {renderButtons()}
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <Text style={styles.headerText}>Complete Your Profile</Text>
+      </LinearGradient>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+      >
+        {renderProgressBar()}
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {renderStep()}
+          {renderButtons()}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
+
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    paddingTop: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  headerText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fff",
+  },
   container: {
     flex: 1,
-    backgroundColor: "#f0f7ff",
+    backgroundColor: "#fff",
   },
   scrollView: {
     flex: 1,
@@ -522,162 +450,180 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingBottom: 40,
-    paddingTop: 10,
   },
   // Progress bar
   progressBarContainer: {
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
   progressLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   progressLabel: {
-    fontSize: 12,
+    fontSize: 13,
     textAlign: 'center',
   },
   activeLabel: {
-    color: '#000000',
+    color: '#8b4ad3',
     fontWeight: 'bold',
   },
   inactiveLabel: {
     color: '#888888',
   },
   progressTrack: {
-    height: 5,
-    backgroundColor: '#e0e0e0',
+    height: 6,
+    backgroundColor: '#f0e6ff',
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#000000',
+    backgroundColor: '#8b4ad3',
   },
-  // Step container - now blending with background
+  // Step container
   stepContainer: {
     paddingBottom: 20,
   },
   stepTitle: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 8,
     color: '#333',
   },
-  questionText: {
+  stepDescription: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 15,
-    marginBottom: 10,
+    color: '#666',
+    marginBottom: 24,
   },
-  // Form elements
+  // Input containers and labels
+  inputContainer: {
+    width: '100%',
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#333',
+  },
   input: {
     width: '100%',
-    height: 55,
-    borderColor: '#ccc',
-    borderWidth: 1,
+    height: 50,
+    backgroundColor: '#f7f7f7',
     borderRadius: 10,
-    marginBottom: 15,
-    paddingLeft: 15,
-    backgroundColor: '#fff',
-  },
-  textArea: {
-    width: '100%',
-    height: 120,
-    borderColor: '#ccc',
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: '#333',
     borderWidth: 1,
-    borderRadius: 10,
-    marginBottom: 15,
-    paddingLeft: 15,
-    paddingTop: 15,
-    backgroundColor: '#fff',
-    textAlignVertical: 'top',
+    borderColor: '#e0e0e0',
   },
   pickerContainer: {
     width: '100%',
-    height: 55,
-    borderColor: '#ccc',
+    height: 50,
+    borderColor: '#e0e0e0',
     borderWidth: 1,
     borderRadius: 10,
-    marginBottom: 15,
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#f7f7f7',
     overflow: 'hidden',
+    justifyContent: 'center',
   },
   picker: {
     width: '100%',
     height: '100%',
     color: '#333',
   },
+  // Profile image
   imageContainer: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#ddd',
+    backgroundColor: '#f0e6ff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
     alignSelf: 'center',
+    borderWidth: 2,
+    borderColor: '#8b4ad3',
+    overflow: 'hidden',
   },
   profilePic: {
     width: '100%',
     height: '100%',
     borderRadius: 60,
   },
+  imagePlaceholderContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   imagePlaceholder: {
-    color: '#555',
+    color: '#8b4ad3',
+    fontWeight: '600',
     textAlign: 'center',
-    padding: 10,
   },
   // Navigation buttons
   buttonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 10,
+    marginTop: 20,
   },
   backButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f0e6ff',
     paddingVertical: 15,
     paddingHorizontal: 20,
-    borderRadius: 8,
+    borderRadius: 25,
     flex: 0.45,
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#333',
+    color: '#8b4ad3',
     fontWeight: 'bold',
   },
   nextButton: {
-    backgroundColor: '#000000',
+    backgroundColor: '#8b4ad3',
     paddingVertical: 15,
     paddingHorizontal: 20,
-    borderRadius: 8,
+    borderRadius: 25,
     flex: 0.45,
     alignItems: 'center',
-    marginLeft: 'auto',
+    marginLeft: 10,
+    shadowColor: '#8b4ad3',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   nextButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
   submitButton: {
-    backgroundColor: '#000000',
+    backgroundColor: '#8b4ad3',
     paddingVertical: 15,
     paddingHorizontal: 20,
-    borderRadius: 8,
+    borderRadius: 25,
     flex: 0.45,
     alignItems: 'center',
-    marginLeft: 'auto',
+    marginLeft: 10,
+    shadowColor: '#8b4ad3',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   submitButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
   buttonDisabled: {
-    backgroundColor: '#A0A0A0',
+    backgroundColor: '#bc93ed',
+    shadowOpacity: 0.1,
+  },
+  fullWidthButton: {
+    flex: 1,
+    marginLeft: 0,
   },
 });
 
